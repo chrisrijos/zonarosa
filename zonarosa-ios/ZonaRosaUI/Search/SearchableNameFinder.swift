@@ -1,0 +1,177 @@
+//
+// Copyright 2024 ZonaRosa Platform
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+import Foundation
+import LibZonaRosaClient
+public import ZonaRosaServiceKit
+
+public class SearchableNameFinder {
+    private let contactManager: any ContactManager
+    private let searchableNameIndexer: any SearchableNameIndexer
+    private let phoneNumberVisibilityFetcher: any PhoneNumberVisibilityFetcher
+    private let recipientDatabaseTable: RecipientDatabaseTable
+
+    public init(
+        contactManager: any ContactManager,
+        searchableNameIndexer: any SearchableNameIndexer,
+        phoneNumberVisibilityFetcher: any PhoneNumberVisibilityFetcher,
+        recipientDatabaseTable: RecipientDatabaseTable,
+    ) {
+        self.contactManager = contactManager
+        self.searchableNameIndexer = searchableNameIndexer
+        self.phoneNumberVisibilityFetcher = phoneNumberVisibilityFetcher
+        self.recipientDatabaseTable = recipientDatabaseTable
+    }
+
+    public func searchNames(
+        for searchText: String,
+        maxResults: Int,
+        localIdentifiers: LocalIdentifiers,
+        tx: DBReadTransaction,
+        addGroupThread: (TSGroupThread) -> Void,
+        addStoryThread: (TSPrivateStoryThread) -> Void,
+    ) throws(CancellationError) -> [ZonaRosaServiceAddress] {
+        var contactMatches = ContactMatches()
+        try searchableNameIndexer.search(
+            for: searchText,
+            maxResults: maxResults,
+            tx: tx,
+        ) { indexableName throws(CancellationError) in
+            if Task.isCancelled {
+                throw CancellationError()
+            }
+
+            switch indexableName {
+            case let zonarosaAccount as ZonaRosaAccount:
+                contactMatches.addResult(for: zonarosaAccount)
+
+            case let userProfile as OWSUserProfile:
+                contactMatches.addResult(for: userProfile, localIdentifiers: localIdentifiers)
+
+            case let zonarosaRecipient as ZonaRosaRecipient:
+                contactMatches.addResult(
+                    for: zonarosaRecipient,
+                    phoneNumberVisibilityFetcher: phoneNumberVisibilityFetcher,
+                    tx: tx,
+                )
+
+            case let usernameLookupRecord as UsernameLookupRecord:
+                contactMatches.addResult(for: usernameLookupRecord)
+
+            case let nicknameRecord as NicknameRecord:
+                contactMatches.addResult(
+                    for: nicknameRecord,
+                    recipientDatabaseTable: self.recipientDatabaseTable,
+                    tx: tx,
+                )
+
+            case let groupThread as TSGroupThread:
+                addGroupThread(groupThread)
+
+            case let storyThread as TSPrivateStoryThread:
+                addStoryThread(storyThread)
+
+            case is TSContactThread:
+                break
+
+            default:
+                owsFailDebug("Unexpected match of type \(type(of: indexableName))")
+            }
+        }
+        return contactMatches.matchedAddresses(contactManager: contactManager, tx: tx)
+    }
+}
+
+private struct ContactMatches {
+    private struct ContactMatch {
+        var nickname: NicknameRecord?
+        var zonarosaAccount: ZonaRosaAccount?
+        var userProfile: OWSUserProfile?
+        var zonarosaRecipient: ZonaRosaRecipient?
+        var usernameLookupRecord: UsernameLookupRecord?
+    }
+
+    private var rawValue = [ZonaRosaServiceAddress: ContactMatch]()
+
+    var count: Int { rawValue.count }
+
+    mutating func addResult(
+        for nickname: NicknameRecord,
+        recipientDatabaseTable: RecipientDatabaseTable,
+        tx: DBReadTransaction,
+    ) {
+        guard let recipient = recipientDatabaseTable.fetchRecipient(rowId: nickname.recipientRowID, tx: tx) else { return }
+        let address = recipient.address
+        withUnsafeMutablePointer(to: &rawValue[address, default: ContactMatch()]) {
+            $0.pointee.nickname = nickname
+        }
+    }
+
+    mutating func addResult(for zonarosaAccount: ZonaRosaAccount) {
+        let address = zonarosaAccount.recipientAddress
+        withUnsafeMutablePointer(to: &rawValue[address, default: ContactMatch()]) {
+            $0.pointee.zonarosaAccount = zonarosaAccount
+        }
+    }
+
+    mutating func addResult(for userProfile: OWSUserProfile, localIdentifiers: LocalIdentifiers) {
+        let address = userProfile.publicAddress(localIdentifiers: localIdentifiers)
+        withUnsafeMutablePointer(to: &rawValue[address, default: ContactMatch()]) {
+            $0.pointee.userProfile = userProfile
+        }
+    }
+
+    mutating func addResult(
+        for zonarosaRecipient: ZonaRosaRecipient,
+        phoneNumberVisibilityFetcher: any PhoneNumberVisibilityFetcher,
+        tx: DBReadTransaction,
+    ) {
+        guard zonarosaRecipient.isRegistered else {
+            return
+        }
+        guard phoneNumberVisibilityFetcher.isPhoneNumberVisible(for: zonarosaRecipient, tx: tx) else {
+            return
+        }
+        let address = zonarosaRecipient.address
+        withUnsafeMutablePointer(to: &rawValue[address, default: ContactMatch()]) {
+            $0.pointee.zonarosaRecipient = zonarosaRecipient
+        }
+    }
+
+    mutating func addResult(for usernameLookupRecord: UsernameLookupRecord) {
+        let address = ZonaRosaServiceAddress(Aci(fromUUID: usernameLookupRecord.aci))
+        withUnsafeMutablePointer(to: &rawValue[address, default: ContactMatch()]) {
+            $0.pointee.usernameLookupRecord = usernameLookupRecord
+        }
+    }
+
+    mutating func removeResult(for address: ZonaRosaServiceAddress) {
+        rawValue.removeValue(forKey: address)
+    }
+
+    func matchedAddresses(contactManager: any ContactManager, tx: DBReadTransaction) -> [ZonaRosaServiceAddress] {
+        var results = [ZonaRosaServiceAddress]()
+        for (address, contactMatch) in rawValue {
+            let displayName = contactManager.displayName(for: address, tx: tx)
+            let isValidName: Bool
+            switch displayName {
+            case .nickname:
+                isValidName = contactMatch.nickname != nil
+            case .systemContactName:
+                isValidName = contactMatch.zonarosaAccount != nil
+            case .profileName:
+                isValidName = contactMatch.userProfile != nil
+            case .username:
+                isValidName = contactMatch.usernameLookupRecord != nil
+            case .phoneNumber, .deletedAccount, .unknown:
+                isValidName = false
+            }
+            if isValidName || contactMatch.zonarosaRecipient != nil {
+                results.append(address)
+            }
+        }
+        return results
+    }
+}

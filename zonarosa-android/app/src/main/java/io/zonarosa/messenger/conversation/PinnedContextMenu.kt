@@ -1,0 +1,119 @@
+package io.zonarosa.messenger.conversation
+
+import android.content.Context
+import android.view.View
+import android.view.ViewGroup
+import io.zonarosa.core.util.DimensionUnit
+import io.zonarosa.messenger.R
+import io.zonarosa.messenger.components.menu.ActionItem
+import io.zonarosa.messenger.components.menu.ZonaRosaContextMenu
+import io.zonarosa.messenger.database.model.MmsMessageRecord
+import io.zonarosa.messenger.util.hasGiftBadge
+import io.zonarosa.messenger.util.isPoll
+import io.zonarosa.messenger.util.isViewOnceMessage
+import io.zonarosa.core.ui.R as CoreUiR
+
+/**
+ * A context menu shown when long pressing on a pinned messages
+ */
+object PinnedContextMenu {
+
+  fun show(
+    context: Context,
+    anchorView: View,
+    rootView: ViewGroup = anchorView.rootView as ViewGroup,
+    message: MmsMessageRecord,
+    isGroup: Boolean,
+    canUnpin: Boolean,
+    onUnpin: () -> Unit = {},
+    onCopy: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onSave: () -> Unit = {}
+  ) {
+    show(
+      context = context,
+      anchorView = anchorView,
+      rootView = rootView,
+      message = message,
+      isGroup = isGroup,
+      canUnpin = canUnpin,
+      callbacks = object : Callbacks {
+        override fun onUnpin() = onUnpin()
+        override fun onCopy() = onCopy()
+        override fun onDelete() = onDelete()
+        override fun onSave() = onSave()
+      }
+    )
+  }
+
+  private fun show(
+    context: Context,
+    anchorView: View,
+    rootView: ViewGroup,
+    message: MmsMessageRecord,
+    isGroup: Boolean,
+    canUnpin: Boolean,
+    callbacks: Callbacks
+  ) {
+    val actions = mutableListOf<ActionItem>().apply {
+      if (canUnpin) {
+        add(
+          ActionItem(R.drawable.symbol_pin_slash_24, context.getString(R.string.PinnedMessage__unpin)) {
+            callbacks.onUnpin()
+          }
+        )
+      }
+
+      if (message.body.isNotEmpty() &&
+        !message.isRemoteDelete &&
+        !message.isPaymentNotification &&
+        !message.isPoll() &&
+        !message.hasGiftBadge()
+      ) {
+        add(
+          ActionItem(CoreUiR.drawable.symbol_copy_android_24, context.getString(R.string.conversation_selection__menu_copy)) {
+            callbacks.onCopy()
+          }
+        )
+      }
+
+      if (!message.isRemoteDelete) {
+        add(
+          ActionItem(CoreUiR.drawable.symbol_trash_24, context.getString(R.string.conversation_selection__menu_delete)) {
+            callbacks.onDelete()
+          }
+        )
+      }
+
+      if (
+        !message.isViewOnceMessage() &&
+        !message.isMediaPending &&
+        !message.hasGiftBadge() &&
+        message.containsMediaSlide() &&
+        message.slideDeck.getStickerSlide() == null
+      ) {
+        add(
+          ActionItem(R.drawable.symbol_save_android_24, context.getString(R.string.conversation_selection__menu_save)) {
+            callbacks.onSave()
+          }
+        )
+      }
+    }
+
+    val horizontalPosition = if (message.isOutgoing) ZonaRosaContextMenu.HorizontalPosition.END else ZonaRosaContextMenu.HorizontalPosition.START
+    val offsetX = if (message.isOutgoing || !isGroup) 16f else 48f
+    ZonaRosaContextMenu.Builder(anchorView, rootView)
+      .preferredHorizontalPosition(horizontalPosition)
+      .preferredVerticalPosition(ZonaRosaContextMenu.VerticalPosition.BELOW)
+      .offsetX(DimensionUnit.DP.toPixels(offsetX).toInt())
+      .offsetY(DimensionUnit.DP.toPixels(4f).toInt())
+      .show(actions)
+  }
+
+  private interface Callbacks {
+    fun onUnpin()
+    fun onCopy()
+    fun onDelete()
+    fun onSave()
+  }
+}

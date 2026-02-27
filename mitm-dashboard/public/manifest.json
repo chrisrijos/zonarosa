@@ -1,0 +1,20 @@
+{
+  "name": "ZonaRosa MITM Lab",
+  "short_name": "ZonaRosa",
+  "description": "ZonaRosa Cryptography Lab — MITM Intercept Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0c10",
+  "theme_color": "#8b5cf6",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f1117'/><text y='62' x='50' text-anchor='middle' font-size='55' fill='%238b5cf6'>◈</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "utilities"],
+  "screenshots": []
+}

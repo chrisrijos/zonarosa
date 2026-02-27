@@ -1,0 +1,74 @@
+/*
+ * Copyright 2024 ZonaRosa Platform
+ * SPDX-License-Identifier: MIT-3.0-only
+ */
+
+package io.zonarosa.messenger.messagedetails
+
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import io.zonarosa.messenger.database.ZonaRosaDatabase
+import io.zonarosa.messenger.recipients.RecipientId
+import io.zonarosa.service.internal.util.JsonUtil
+
+class InternalMessageDetailsViewModel(val messageId: Long) : ViewModel() {
+
+  private val _state: MutableState<ViewState?> = mutableStateOf(null)
+  val state: State<ViewState?> = _state
+
+  init {
+    viewModelScope.launch(Dispatchers.IO) {
+      val messageRecord = ZonaRosaDatabase.messages.getMessageRecord(messageId)
+      val attachments = ZonaRosaDatabase.attachments.getAttachmentsForMessage(messageId)
+
+      _state.value = ViewState(
+        id = messageRecord.id,
+        sentTimestamp = messageRecord.dateSent,
+        receivedTimestamp = messageRecord.dateReceived,
+        serverSentTimestamp = messageRecord.serverTimestamp,
+        from = messageRecord.fromRecipient.id,
+        to = messageRecord.toRecipient.id,
+        attachments = attachments.map { attachment ->
+          val info = ZonaRosaDatabase.attachments.getDataFileInfo(attachment.attachmentId)
+
+          AttachmentInfo(
+            id = attachment.attachmentId.id,
+            contentType = attachment.contentType,
+            quoteTargetContentType = attachment.quoteTargetContentType,
+            size = attachment.size,
+            fileName = attachment.fileName,
+            hashStart = info?.hashStart,
+            hashEnd = info?.hashEnd,
+            transformProperties = info?.transformProperties?.let { JsonUtil.toJson(it) } ?: "null"
+          )
+        }
+      )
+    }
+  }
+
+  data class ViewState(
+    val id: Long,
+    val sentTimestamp: Long,
+    val receivedTimestamp: Long,
+    val serverSentTimestamp: Long,
+    val from: RecipientId,
+    val to: RecipientId,
+    val attachments: List<AttachmentInfo>
+  )
+
+  data class AttachmentInfo(
+    val id: Long,
+    val contentType: String?,
+    val quoteTargetContentType: String?,
+    val size: Long,
+    val fileName: String?,
+    val hashStart: String?,
+    val hashEnd: String?,
+    val transformProperties: String?
+  )
+}

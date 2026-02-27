@@ -1,0 +1,87 @@
+//
+// Copyright 2024 ZonaRosa Platform
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+import Foundation
+
+#if TESTABLE_BUILD
+
+open class AttachmentDownloadManagerMock: AttachmentDownloadManager {
+
+    public init() {}
+
+    public func backupCdnInfo(metadata: BackupReadCredential) async throws -> BackupCdnInfo {
+        return BackupCdnInfo(
+            fileInfo: AttachmentDownloads.CdnInfo(contentLength: 0, lastModified: Date()),
+            metadataHeader: BackupNonce.MetadataHeader(data: Data()),
+        )
+    }
+
+    public func downloadBackup(
+        metadata: BackupReadCredential,
+        progress: OWSProgressSink?,
+    ) async throws -> URL {
+        try! await Task.sleep(nanoseconds: TimeInterval.infinity.clampedNanoseconds)
+        fatalError()
+    }
+
+    public func downloadTransientAttachment(
+        metadata: AttachmentDownloads.DownloadMetadata,
+        progress: OWSProgressSink?,
+    ) async throws -> URL {
+        try! await Task.sleep(nanoseconds: TimeInterval.infinity.clampedNanoseconds)
+        fatalError()
+    }
+
+    open func enqueueDownloadOfAttachmentsForMessage(
+        _ message: TSMessage,
+        priority: AttachmentDownloadPriority,
+        tx: DBWriteTransaction,
+    ) {
+        // Do nothing
+    }
+
+    open func enqueueDownloadOfAttachmentsForStoryMessage(
+        _ message: StoryMessage,
+        priority: AttachmentDownloadPriority,
+        tx: DBWriteTransaction,
+    ) {
+        // Do nothing
+    }
+
+    open func enqueueDownloadOfAttachment(
+        id: Attachment.IDType,
+        priority: AttachmentDownloadPriority,
+        source: QueuedAttachmentDownloadRecord.SourceType,
+        tx: DBWriteTransaction,
+    ) {
+        // Do nothing
+    }
+
+    open func downloadAttachment(
+        id: Attachment.IDType,
+        priority: AttachmentDownloadPriority,
+        source: QueuedAttachmentDownloadRecord.SourceType,
+        progress: OWSProgressSink?,
+    ) async throws {
+        // Do nothing
+    }
+
+    open func beginDownloadingIfNecessary() {
+        // Do nothing
+    }
+
+    open func cancelDownload(
+        for attachmentId: Attachment.IDType,
+        tx: DBWriteTransaction,
+    ) {
+        // Do nothing
+    }
+
+    open func downloadProgress(for attachmentId: Attachment.IDType, tx: DBReadTransaction) -> CGFloat? {
+        return nil
+    }
+}
+
+#endif

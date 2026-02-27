@@ -1,0 +1,13 @@
+//
+// Copyright 2014 ZonaRosa Platform
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+#import <Availability.h>
+
+#ifdef __OBJC__
+    #import <UIKit/UIKit.h>
+    #import <Foundation/Foundation.h>
+
+    #import <ZonaRosaServiceKit/OWSAsserts.h>
+#endif

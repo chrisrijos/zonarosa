@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosa needs to use Apple Music to play media attachments.";
+NSCameraUsageDescription = "ZonaRosa uses your camera to take photos and for video calls.";
+NSContactsUsageDescription = "ZonaRosa uses your contacts to find users you know. We do not store your contacts on the server.";
+NSFaceIDUsageDescription = "ZonaRosa's Screen Lock uses Face ID.";
+NSLocationWhenInUseUsageDescription = "ZonaRosa needs access to your location in order to share your current location.";
+NSMicrophoneUsageDescription = "ZonaRosa needs access to your microphone to make and receive phone calls and record voice messages.";
+NSPhotoLibraryAddUsageDescription = "ZonaRosa will save photos to your library.";
+NSPhotoLibraryUsageDescription = "ZonaRosa will let you choose which photos from your library to send.";
+NSLocalNetworkUsageDescription = "ZonaRosa uses the local network to allow you to directly transfer your account to a new phone. It will not be used unless you explicitly choose to initiate a transfer to a new device.";

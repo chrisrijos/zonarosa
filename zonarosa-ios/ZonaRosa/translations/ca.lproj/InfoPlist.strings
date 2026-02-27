@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "El ZonaRosa necessita usar l'Apple Music per a reproduir fitxers adjunts.";
+NSCameraUsageDescription = "El ZonaRosa usa la càmera per a fer fotografies i per a trucades de vídeo.";
+NSContactsUsageDescription = "El ZonaRosa usa els contactes per a trobar usuaris que coneixeu. No emmagatzemem els vostres contactes al servidor.";
+NSFaceIDUsageDescription = "El bloqueig de pantalla del ZonaRosa usa el Face ID.";
+NSLocationWhenInUseUsageDescription = "El ZonaRosa necessita accés a la ubicació per a compartir l'actual.";
+NSMicrophoneUsageDescription = "El ZonaRosa necessita accés al micròfon per a fer i rebre trucades i enregistrar missatges de veu.";
+NSPhotoLibraryAddUsageDescription = "El ZonaRosa desarà les fotografies a la biblioteca.";
+NSPhotoLibraryUsageDescription = "El ZonaRosa us permetrà triar quines fotografies de la biblioteca voleu enviar.";
+NSLocalNetworkUsageDescription = "El ZonaRosa usa la xarxa local perquè pugueu transferir directament el vostre compte a un telèfon nou. No s’usarà tret que decidiu explícitament iniciar una transferència a un dispositiu nou.";

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright 2024 ZonaRosa Platform
+  ~ SPDX-License-Identifier: MIT-3.0-only
+  -->
+<paths>
+    <files-path name="internal" path="." />
+</paths>

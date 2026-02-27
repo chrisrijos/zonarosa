@@ -1,0 +1,25 @@
+resourcePackages:
+  - io.zonarosa.server
+prettyPrint: true
+cacheTTL: 0
+readerClass: io.zonarosa.openapi.OpenApiReader
+openAPI:
+  info:
+    title: ZonaRosa Server API
+    license:
+      name: MIT-3.0-only
+      url: https://www.opensource.org/licenses/MIT-3.0.txt
+  servers:
+    - url: https://chat.zonarosa.io
+      description: Production service
+    - url: https://chat.staging.zonarosa.io
+      description: Staging service
+  components:
+    securitySchemes:
+      authenticatedAccount:
+        type: http
+        scheme: basic
+        description: |
+          Account authentication is based on Basic authentication schema, 
+          where `username` has a format of `<user_id>[.<device_id>]`. If `device_id` is not specified,
+          user's `main` device is assumed.

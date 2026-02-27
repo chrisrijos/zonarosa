@@ -1,0 +1,2 @@
+io.zonarosa.server.metrics.LogstashTcpSocketAppenderFactory
+io.zonarosa.server.metrics.OpenTelemetryAppenderFactory

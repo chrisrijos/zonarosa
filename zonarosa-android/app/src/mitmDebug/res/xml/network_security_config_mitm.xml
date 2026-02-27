@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ZonaRosa Android — Network Security Configuration (MITM Intercept Mode)
+
+  This config is active when the app is built with the `mitmDebug` build variant.
+  It tells the Android TLS stack to trust plain HTTP connections to the
+  MITM proxy server on the local network, and trust cleartext traffic.
+
+  In production: use the standard network_security_config.xml (HTTPS only).
+
+  Usage:
+    ./gradlew installMitmDebug
+    adb shell am start -n io.zonarosa.messenger/.RegistrationActivity
+-->
+<network-security-config>
+  <!-- Allow cleartext HTTP to the MITM proxy on LAN -->
+  <domain-config cleartextTrafficPermitted="true">
+    <!-- Replace with your MITM server LAN IP shown on startup -->
+    <domain includeSubdomains="false">192.168.1.0</domain>
+    <domain includeSubdomains="false">10.0.0.0</domain>
+    <domain includeSubdomains="false">localhost</domain>
+  </domain-config>
+
+  <!-- Everything else remains HTTPS-only -->
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

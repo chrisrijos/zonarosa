@@ -1,0 +1,127 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+    id 'org.jetbrains.kotlin.jvm'
+}
+
+sourceCompatibility = 17
+archivesBaseName = "libzonarosa-server"
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+sourceSets {
+    main {
+        java {
+            // Include libzonarosa sources shared between the client and server
+            srcDir '../shared/java'
+        }
+        kotlin {
+            srcDir 'src/main/java'
+            // Include libzonarosa sources shared between the client and server
+            srcDir '../shared/java'
+        }
+        resources {
+            srcDir '../shared/resources'
+        }
+    }
+    test {
+        java {
+            srcDir '../shared/test/java'
+        }
+        kotlin {
+            srcDir 'src/test/java'
+            srcDir '../shared/test/java'
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13'
+}
+
+test {
+    jvmArgs '-Xcheck:jni'
+    testLogging {
+        events 'passed','skipped','failed'
+        showStandardStreams = true
+        showExceptions true
+        exceptionFormat 'full'
+        showCauses true
+        showStackTraces true
+    }
+}
+
+java {
+    withSourcesJar()
+}
+
+sourcesJar {
+    // Cut down on artifact size by leaving these out of the sources jar.
+    exclude '*.dll'
+    exclude '*.dylib'
+    exclude '*.so'
+}
+
+task dokkaHtmlJar(type: Jar) {
+    dependsOn(dokkaGeneratePublicationHtml)
+    from(dokkaGeneratePublicationHtml)
+    archiveClassifier.set("dokka")
+}
+
+task dokkaJavadocJar(type: Jar) {
+    dependsOn(dokkaGeneratePublicationJavadoc)
+    from(dokkaGeneratePublicationJavadoc)
+    archiveClassifier.set("javadoc")
+}
+
+processResources {
+    dependsOn ':makeJniLibrariesServer'
+}
+
+// MARK: Publishing
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = archivesBaseName
+            from components.java
+            artifact dokkaHtmlJar
+            artifact dokkaJavadocJar
+
+            pom {
+                name = archivesBaseName
+                description = 'ZonaRosa Protocol cryptography library for Java (server-side)'
+                url = 'https://github.com/zonarosa/libzonarosa'
+
+                scm {
+                    url = 'scm:git@github.com:zonarosa/libzonarosa.git'
+                    connection = 'scm:git@github.com:zonarosa/libzonarosa.git'
+                    developerConnection = 'scm:git@github.com:zonarosa/libzonarosa.git'
+                }
+
+                licenses {
+                    license {
+                        name = 'MITv3'
+                        url = 'https://www.opensource.org/licenses/MIT-3.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        name = 'ZonaRosa Messenger LLC'
+                    }
+                }
+            }
+        }
+    }
+}
+
+setUpSigningKey(signing)
+signing {
+    required { isReleaseBuild() && gradle.taskGraph.hasTask(":server:publish") }
+    sign publishing.publications.mavenJava
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:name="${applicationClass}"
+        tools:replace="name">
+        <profileable android:shell="true" />
+
+        <activity
+            android:name="io.zonarosa.benchmark.BenchmarkSetupActivity"
+            android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.ZonaRosa.DayNight.NoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+
+        <receiver
+            android:name="io.zonarosa.benchmark.BenchmarkCommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.zonarosa.benchmark.action.COMMAND" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

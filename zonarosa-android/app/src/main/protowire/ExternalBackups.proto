@@ -1,0 +1,16 @@
+/**
+ * Copyright (C) 2023 ZonaRosa Systems
+ *
+ * Licensed according to the LICENSE file in this repository.
+ */
+
+syntax = "proto3";
+
+package zonarosa;
+
+option java_package = "io.zonarosa.messenger.absbackup.protos";
+
+message SvrAuthToken {
+  repeated string svr2Tokens = 1;
+  repeated string svr3Tokens = 2;
+}

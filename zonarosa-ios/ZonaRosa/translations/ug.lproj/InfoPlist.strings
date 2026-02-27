@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosa ۋاسىتە قوشۇمچىسىنى قويۇشتا Apple Music نى ئىشلىتىشى لازىم.";
+NSCameraUsageDescription = "‫ZonaRosa سۈرەت تارتىش ۋە سىنلىق پاراڭلىشىشتا كامېرايىڭىزنى ئىشلىتىدۇ.";
+NSContactsUsageDescription = "ZonaRosa سىز تونۇيدىغانلارنى ئىزدەش ئۈچۈن ئالاقىداشلىرىڭىزنى ئىشلىتىدۇ. ئالاقىداشلىرىڭىزنى مۇلازىمېتىردا ساقلىمايمىز.";
+NSFaceIDUsageDescription = "ZonaRosa نىڭ ئېكران قۇلۇپى چىراي ID سىنى ئىشلىتىدۇ.";
+NSLocationWhenInUseUsageDescription = "‫ZonaRosa ھازىرقى ئورنىڭىزنى ھەمبەھىرلەش ئۈچۈن ئورۇن ئۇچۇرىڭىزنى زىيارەت قىلىشى لازىم.";
+NSMicrophoneUsageDescription = "‫ZonaRosa تېلېفوندىن چاقىرىش ۋە قوبۇل قىلىش، ھەم ئۈن ئۈچۇرنى خاتىرىلەش ئۈچۈن مىكروفونىڭىزنى زىيارەت قىلىشى لازىم.";
+NSPhotoLibraryAddUsageDescription = "ZonaRosa سۈرەتلەرنى سۈرەتدانىڭىزغا ساقلايدۇ.";
+NSPhotoLibraryUsageDescription = "ھەمبەھىرلەيدىغان سۈرەتنى ZonaRosa سۈرەتدانىڭىزدىن تاللاتقۇزىدۇ.";
+NSLocalNetworkUsageDescription = "ZonaRosa يەرلىك تورنى ئىشلىتىپ ھېساباتىڭىزنى بىۋاسىتە يېڭى تېلېفونغا يۆتكىشىڭىزگە يول قويىدۇ. پەقەت سىز يۆتكەشنى قوزغاتقاندىلا ئاندىن ZonaRosa بۇ ھوقۇقنى ئىشلىتىپ يېڭى ئۈسكۈنىگە يۆتكەيدۇ.";

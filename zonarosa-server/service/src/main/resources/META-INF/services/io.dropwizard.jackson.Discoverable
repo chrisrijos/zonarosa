@@ -1,0 +1,8 @@
+io.zonarosa.server.configuration.AwsCredentialsProviderFactory
+io.zonarosa.server.configuration.DynamoDbClientFactory
+io.zonarosa.server.configuration.FaultTolerantRedisClusterFactory
+io.zonarosa.server.configuration.FaultTolerantRedisClientFactory
+io.zonarosa.server.configuration.PaymentsServiceClientsFactory
+io.zonarosa.server.configuration.PubSubPublisherFactory
+io.zonarosa.server.configuration.RegistrationServiceClientFactory
+io.zonarosa.server.configuration.S3ObjectMonitorFactory

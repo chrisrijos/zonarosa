@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ZonaRosa Android — MITM Build Manifest
+  Placed in src/mitmDebug/ — merged on top of the main AndroidManifest.xml
+  for the mitmDebug build variant only.
+
+  Key differences from production manifest:
+    1. Uses ZonaRosaApplication (MITM variant) as the Application class
+    2. network_security_config points to the MITM-permissive config
+    3. App label shows "[MITM]" so students see which build they have
+    4. usesCleartextTraffic = true for LAN/HTTP proxy connections
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:name=".ZonaRosaApplication"
+        android:label="ZonaRosa [MITM]"
+        android:networkSecurityConfig="@xml/network_security_config_mitm"
+        android:usesCleartextTraffic="true"
+        tools:replace="android:label,android:networkSecurityConfig,android:usesCleartextTraffic">
+    </application>
+
+</manifest>

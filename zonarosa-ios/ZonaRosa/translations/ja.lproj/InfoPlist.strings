@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosaがメディアファイルを再生するにはApple Musicが必要です。";
+NSCameraUsageDescription = "ZonaRosaはビデオ通話と写真撮影のためにカメラを利用します。";
+NSContactsUsageDescription = "ZonaRosaは他のユーザを探すために連絡先にアクセスします。連絡先の情報はサーバには保存されません。";
+NSFaceIDUsageDescription = "ZonaRosaの画面ロックはFace IDを利用します。";
+NSLocationWhenInUseUsageDescription = "ZonaRosaは現在地を共有するために位置情報を利用します。";
+NSMicrophoneUsageDescription = "ZonaRosaは音声通話と音声メッセージの録音にマイクを利用します。";
+NSPhotoLibraryAddUsageDescription = "ZonaRosaは写真をフォトライブラリに保存します。";
+NSPhotoLibraryUsageDescription = "ZonaRosaは送信する写真をフォトライブラリから選択します。";
+NSLocalNetworkUsageDescription = "ZonaRosaはLANを使用して、アカウントを新しい電話に直接転送できます。この機能は、あなたが明示的に操作しない限り使用されません。";

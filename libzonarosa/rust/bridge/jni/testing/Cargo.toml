@@ -1,0 +1,26 @@
+#
+# Copyright (C) 2024 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-jni-testing"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition = "2024"
+
+[lints]
+workspace = true
+
+[lib]
+name = "zonarosa_jni_testing"
+crate-type = ["cdylib"]
+
+[dependencies]
+libzonarosa-bridge-testing = { workspace = true, features = ["jni"] }
+libzonarosa-bridge-types = { workspace = true, features = ["jni"] }
+libzonarosa-jni-impl = { workspace = true }
+
+jni = { workspace = true }
+log = { workspace = true }

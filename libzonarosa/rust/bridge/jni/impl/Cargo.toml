@@ -1,0 +1,33 @@
+#
+# Copyright (C) 2020-2021 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-jni-impl"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+libzonarosa-bridge = { workspace = true, features = ["jni", "zonarosa-media"] }
+libzonarosa-core = { workspace = true }
+libzonarosa-protocol = { workspace = true }
+zonarosa-crypto = { workspace = true }
+
+cfg-if = { workspace = true }
+jni = { workspace = true }
+log = { workspace = true }
+log-panics = { workspace = true, features = ["with-backtrace"] }
+
+[target.aarch64-linux-android.dependencies]
+cpufeatures = "0.2.6" # Make sure 64-bit Android gets optimized crypto
+
+[target.'cfg(target_os = "android")'.dependencies]
+rustls-platform-verifier = { workspace = true }
+# Make sure we're using the system zlib on Android.
+flate2 = { workspace = true, features = ["zlib"] }

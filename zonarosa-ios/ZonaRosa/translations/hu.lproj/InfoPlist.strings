@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "A ZonaRosanak szüksége van Apple Music hozzáférésre a média csatolmány lejátszásához.";
+NSCameraUsageDescription = "A ZonaRosa a kamerád segítségével készít fotókat és végez videóhívásokat.";
+NSContactsUsageDescription = "A ZonaRosa a kontaktlistádat használja ismerőseid megtalálásához. Nem tárolunk kontaktlistát szerverünkön.";
+NSFaceIDUsageDescription = "A ZonaRosa képernyőzár Face ID funkciót használ.";
+NSLocationWhenInUseUsageDescription = "A ZonaRosanak szüksége van a helyzetadataidra pozíciód megosztásához.";
+NSMicrophoneUsageDescription = "A ZonaRosanak szüksége van mikrofon hozzáférésre hívások indításához, fogadásához és hangjegyzetek küldéséhez.";
+NSPhotoLibraryAddUsageDescription = "A ZonaRosa a fotógalériádba menti képeidet.";
+NSPhotoLibraryUsageDescription = "A ZonaRosaban válogathatsz melyik képet szeretnéd elküldeni.";
+NSLocalNetworkUsageDescription = "Amennyiben tudatosan ezt a funkciót választod, a ZonaRosa a helyi hálózatot a fiókod új telefonra költöztetéséhez használja - semmilyen más célra nem.";

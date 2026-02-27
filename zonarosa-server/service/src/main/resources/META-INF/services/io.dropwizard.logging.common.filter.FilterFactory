@@ -1,0 +1,2 @@
+io.zonarosa.server.util.logging.RequestLogEnabledFilterFactory
+io.zonarosa.server.util.logging.UnknownKeepaliveOptionFilterFactory

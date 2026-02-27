@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosa'in içerik eklentilerini oynatması için Apple Music'e ihtiyacı var.";
+NSCameraUsageDescription = "ZonaRosa fotoğraf çekmek ve görüntülü aramalar gerçekleştirmek için kameranızı kullanır.";
+NSContactsUsageDescription = "ZonaRosa tanıdığınız kullanıcıları bulmak için rehberinizi kullanır. Kişilerinizi sunuclarımızda saklamamaktayız.";
+NSFaceIDUsageDescription = "ZonaRosa'in Ekran Kilidi Face ID kullanır.";
+NSLocationWhenInUseUsageDescription = "ZonaRosa'in mevcut konumunuzu paylaşmak için konum erişimine ihtiyacı var.";
+NSMicrophoneUsageDescription = "ZonaRosa'in sesli aramalar gerçekleştirmek ve sesli iletiler gönderebilmek için mikrofonunuza erişime ihtiyacı var.";
+NSPhotoLibraryAddUsageDescription = "ZonaRosa fotoğrafları albümlerinize kaydedecektir.";
+NSPhotoLibraryUsageDescription = "ZonaRosa, göndermek istediğiniz fotoğrafları albümlerinizden seçmenizi sağlayacaktır.";
+NSLocalNetworkUsageDescription = "ZonaRosa, hesabınızı doğrudan yeni bir telefona aktarmanıza izin vermek için yerel ağı kullanır. Yeni bir aygıta aktarım başlatmayı açıkça seçmediğiniz sürece kullanılmayacaktır.";

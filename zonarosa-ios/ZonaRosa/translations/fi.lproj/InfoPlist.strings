@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosa tarvitsee Apple Music -käyttöoikeuden medialiitteiden toistamiseen.";
+NSCameraUsageDescription = "ZonaRosa käyttää kameraa kuvaamiseen ja videopuheluihin.";
+NSContactsUsageDescription = "ZonaRosa käyttää yhteystietoja tuntemiesi ihmisten löytämiseen. Yhteystietoja ei tallenneta ZonaRosain palvelimelle.";
+NSFaceIDUsageDescription = "ZonaRosain näytön lukitus käyttää Face ID:tä.";
+NSLocationWhenInUseUsageDescription = "ZonaRosa tarvitsee sijaintitietojen käyttöoikeuden sijaintisi jakamiseksi.";
+NSMicrophoneUsageDescription = "ZonaRosa tarvitsee mikrofonin käyttöoikeuden puheluihin ja ääniviesteihin.";
+NSPhotoLibraryAddUsageDescription = "ZonaRosa tallentaa kuvat kirjastoon.";
+NSPhotoLibraryUsageDescription = "ZonaRosa antaa valita, mitä kuvia kirjastosta lähetetään.";
+NSLocalNetworkUsageDescription = "ZonaRosa käyttää lähiverkkoa tilin siirtämiseen uuteen puhelimeen. Lähiverkkoa ei käytetä muihin toimintoihin.";

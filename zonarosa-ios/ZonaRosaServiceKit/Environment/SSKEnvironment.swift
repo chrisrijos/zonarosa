@@ -1,0 +1,342 @@
+//
+// Copyright 2023 ZonaRosa Platform
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+import Foundation
+
+public class SSKEnvironment: NSObject {
+
+    private static var _shared: SSKEnvironment?
+
+    public static var hasShared: Bool { _shared != nil }
+
+    @objc
+    public static var shared: SSKEnvironment { _shared! }
+
+    public static func setShared(_ env: SSKEnvironment?, isRunningTests: Bool) {
+        owsPrecondition((_shared == nil && env != nil) || isRunningTests)
+        _shared = env
+    }
+
+#if TESTABLE_BUILD
+    public private(set) var contactManagerRef: any ContactManager
+    public private(set) var messageSenderRef: MessageSender
+    public private(set) var networkManagerRef: NetworkManager
+    public private(set) var paymentsHelperRef: PaymentsHelperSwift
+    public private(set) var groupsV2Ref: GroupsV2
+#else
+    public let contactManagerRef: any ContactManager
+    public let messageSenderRef: MessageSender
+    public let networkManagerRef: NetworkManager
+    public let paymentsHelperRef: PaymentsHelperSwift
+    public let groupsV2Ref: GroupsV2
+#endif
+    /// This should be deprecated.
+    public var contactManagerImplRef: OWSContactsManager { contactManagerRef as! OWSContactsManager }
+    @objc
+    public var contactManagerObjcRef: ContactsManagerProtocol { contactManagerRef }
+
+    public let pendingReceiptRecorderRef: PendingReceiptRecorder
+    public let profileManagerRef: ProfileManager
+    /// This should be deprecated.
+    public var profileManagerImplRef: OWSProfileManager { profileManagerRef as! OWSProfileManager }
+    public let messageReceiverRef: MessageReceiver
+    public let blockingManagerRef: BlockingManager
+    public let remoteConfigManagerRef: RemoteConfigManager
+    public let udManagerRef: OWSUDManager
+    public let messageDecrypterRef: OWSMessageDecrypter
+    public let groupMessageProcessorManagerRef: GroupMessageProcessorManager
+    public let ows2FAManagerRef: OWS2FAManager
+    @objc
+    public let receiptManagerRef: OWSReceiptManager
+    @objc
+    public let receiptSenderRef: ReceiptSender
+    public let reachabilityManagerRef: SSKReachabilityManager
+    public let syncManagerRef: SyncManagerProtocol
+    public let typingIndicatorsRef: TypingIndicators
+    public let stickerManagerRef: StickerManager
+    @objc
+    public let databaseStorageRef: SDSDatabaseStorage
+    public let zonarosaServiceAddressCacheRef: ZonaRosaServiceAddressCache
+    public let zonarosaServiceRef: OWSZonaRosaServiceProtocol
+    public let storageServiceManagerRef: StorageServiceManager
+    public let sskPreferencesRef: SSKPreferences
+    public let groupV2UpdatesRef: GroupV2Updates
+    public let messageFetcherJobRef: MessageFetcherJob
+    public let versionedProfilesRef: VersionedProfiles
+    @objc
+    public let modelReadCachesRef: ModelReadCaches
+    public let earlyMessageManagerRef: EarlyMessageManager
+    public let messagePipelineSupervisorRef: MessagePipelineSupervisor
+    public let messageProcessorRef: MessageProcessor
+    public let paymentsCurrenciesRef: PaymentsCurrenciesSwift
+    @objc
+    public let paymentsEventsRef: PaymentsEvents
+    public let owsPaymentsLockRef: OWSPaymentsLock
+    public let mobileCoinHelperRef: MobileCoinHelper
+    public let spamChallengeResolverRef: SpamChallengeResolver
+    public let senderKeyStoreRef: OldSenderKeyStore
+    public let phoneNumberUtilRef: PhoneNumberUtil
+    public let webSocketFactoryRef: WebSocketFactory
+    public let systemStoryManagerRef: SystemStoryManagerProtocol
+    public let contactDiscoveryManagerRef: ContactDiscoveryManager
+    public let notificationPresenterRef: any NotificationPresenter
+    public let messageSendLogRef: MessageSendLog
+    public let preferencesRef: Preferences
+    public let proximityMonitoringManagerRef: OWSProximityMonitoringManager
+    public let avatarBuilderRef: AvatarBuilder
+    public let smJobQueuesRef: ZonaRosaMessagingJobQueues
+    public let groupCallManagerRef: GroupCallManager
+    public let profileFetcherRef: any ProfileFetcher
+
+    public let messageSenderJobQueueRef: MessageSenderJobQueue
+    public let localUserLeaveGroupJobQueueRef: LocalUserLeaveGroupJobQueue
+    public let callRecordDeleteAllJobQueueRef: CallRecordDeleteAllJobQueue
+    public let bulkDeleteInteractionJobQueueRef: BulkDeleteInteractionJobQueue
+    let donationReceiptCredentialRedemptionJobQueue: DonationReceiptCredentialRedemptionJobQueue
+
+    private let appExpiryRef: AppExpiry
+    private let aciZonaRosaProtocolStoreRef: ZonaRosaProtocolStore
+    private let pniZonaRosaProtocolStoreRef: ZonaRosaProtocolStore
+
+    init(
+        contactManager: any ContactManager,
+        messageSender: MessageSender,
+        pendingReceiptRecorder: PendingReceiptRecorder,
+        profileManager: ProfileManager,
+        networkManager: NetworkManager,
+        messageReceiver: MessageReceiver,
+        blockingManager: BlockingManager,
+        remoteConfigManager: RemoteConfigManager,
+        aciZonaRosaProtocolStore: ZonaRosaProtocolStore,
+        pniZonaRosaProtocolStore: ZonaRosaProtocolStore,
+        udManager: OWSUDManager,
+        messageDecrypter: OWSMessageDecrypter,
+        groupMessageProcessorManager: GroupMessageProcessorManager,
+        ows2FAManager: OWS2FAManager,
+        receiptManager: OWSReceiptManager,
+        receiptSender: ReceiptSender,
+        reachabilityManager: SSKReachabilityManager,
+        syncManager: SyncManagerProtocol,
+        typingIndicators: TypingIndicators,
+        stickerManager: StickerManager,
+        databaseStorage: SDSDatabaseStorage,
+        zonarosaServiceAddressCache: ZonaRosaServiceAddressCache,
+        zonarosaService: OWSZonaRosaServiceProtocol,
+        storageServiceManager: StorageServiceManager,
+        sskPreferences: SSKPreferences,
+        groupsV2: GroupsV2,
+        groupV2Updates: GroupV2Updates,
+        messageFetcherJob: MessageFetcherJob,
+        versionedProfiles: VersionedProfiles,
+        modelReadCaches: ModelReadCaches,
+        earlyMessageManager: EarlyMessageManager,
+        messagePipelineSupervisor: MessagePipelineSupervisor,
+        appExpiry: AppExpiry,
+        messageProcessor: MessageProcessor,
+        paymentsHelper: PaymentsHelperSwift,
+        paymentsCurrencies: PaymentsCurrenciesSwift,
+        paymentsEvents: PaymentsEvents,
+        paymentsLock: OWSPaymentsLock,
+        mobileCoinHelper: MobileCoinHelper,
+        spamChallengeResolver: SpamChallengeResolver,
+        senderKeyStore: OldSenderKeyStore,
+        phoneNumberUtil: PhoneNumberUtil,
+        webSocketFactory: WebSocketFactory,
+        systemStoryManager: SystemStoryManagerProtocol,
+        contactDiscoveryManager: ContactDiscoveryManager,
+        notificationPresenter: any NotificationPresenter,
+        messageSendLog: MessageSendLog,
+        messageSenderJobQueue: MessageSenderJobQueue,
+        localUserLeaveGroupJobQueue: LocalUserLeaveGroupJobQueue,
+        callRecordDeleteAllJobQueue: CallRecordDeleteAllJobQueue,
+        bulkDeleteInteractionJobQueue: BulkDeleteInteractionJobQueue,
+        donationReceiptCredentialRedemptionJobQueue: DonationReceiptCredentialRedemptionJobQueue,
+        preferences: Preferences,
+        proximityMonitoringManager: OWSProximityMonitoringManager,
+        avatarBuilder: AvatarBuilder,
+        smJobQueues: ZonaRosaMessagingJobQueues,
+        groupCallManager: GroupCallManager,
+        profileFetcher: any ProfileFetcher,
+    ) {
+        self.contactManagerRef = contactManager
+        self.messageSenderRef = messageSender
+        self.pendingReceiptRecorderRef = pendingReceiptRecorder
+        self.profileManagerRef = profileManager
+        self.networkManagerRef = networkManager
+        self.messageReceiverRef = messageReceiver
+        self.blockingManagerRef = blockingManager
+        self.remoteConfigManagerRef = remoteConfigManager
+        self.aciZonaRosaProtocolStoreRef = aciZonaRosaProtocolStore
+        self.pniZonaRosaProtocolStoreRef = pniZonaRosaProtocolStore
+        self.udManagerRef = udManager
+        self.messageDecrypterRef = messageDecrypter
+        self.groupMessageProcessorManagerRef = groupMessageProcessorManager
+        self.ows2FAManagerRef = ows2FAManager
+        self.receiptManagerRef = receiptManager
+        self.receiptSenderRef = receiptSender
+        self.syncManagerRef = syncManager
+        self.reachabilityManagerRef = reachabilityManager
+        self.typingIndicatorsRef = typingIndicators
+        self.stickerManagerRef = stickerManager
+        self.databaseStorageRef = databaseStorage
+        self.zonarosaServiceAddressCacheRef = zonarosaServiceAddressCache
+        self.zonarosaServiceRef = zonarosaService
+        self.storageServiceManagerRef = storageServiceManager
+        self.sskPreferencesRef = sskPreferences
+        self.groupsV2Ref = groupsV2
+        self.groupV2UpdatesRef = groupV2Updates
+        self.messageFetcherJobRef = messageFetcherJob
+        self.versionedProfilesRef = versionedProfiles
+        self.modelReadCachesRef = modelReadCaches
+        self.earlyMessageManagerRef = earlyMessageManager
+        self.messagePipelineSupervisorRef = messagePipelineSupervisor
+        self.appExpiryRef = appExpiry
+        self.messageProcessorRef = messageProcessor
+        self.paymentsHelperRef = paymentsHelper
+        self.paymentsCurrenciesRef = paymentsCurrencies
+        self.paymentsEventsRef = paymentsEvents
+        self.owsPaymentsLockRef = paymentsLock
+        self.mobileCoinHelperRef = mobileCoinHelper
+        self.spamChallengeResolverRef = spamChallengeResolver
+        self.senderKeyStoreRef = senderKeyStore
+        self.phoneNumberUtilRef = phoneNumberUtil
+        self.webSocketFactoryRef = webSocketFactory
+        self.systemStoryManagerRef = systemStoryManager
+        self.contactDiscoveryManagerRef = contactDiscoveryManager
+        self.notificationPresenterRef = notificationPresenter
+        self.messageSendLogRef = messageSendLog
+        self.messageSenderJobQueueRef = messageSenderJobQueue
+        self.localUserLeaveGroupJobQueueRef = localUserLeaveGroupJobQueue
+        self.callRecordDeleteAllJobQueueRef = callRecordDeleteAllJobQueue
+        self.bulkDeleteInteractionJobQueueRef = bulkDeleteInteractionJobQueue
+        self.donationReceiptCredentialRedemptionJobQueue = donationReceiptCredentialRedemptionJobQueue
+        self.preferencesRef = preferences
+        self.proximityMonitoringManagerRef = proximityMonitoringManager
+        self.avatarBuilderRef = avatarBuilder
+        self.smJobQueuesRef = smJobQueues
+        self.groupCallManagerRef = groupCallManager
+        self.profileFetcherRef = profileFetcher
+    }
+
+    public func zonarosaProtocolStoreRef(for identity: OWSIdentity) -> ZonaRosaProtocolStore {
+        switch identity {
+        case .aci:
+            return aciZonaRosaProtocolStoreRef
+        case .pni:
+            return pniZonaRosaProtocolStoreRef
+        }
+    }
+
+    /// Warms (or re-warms) various caches throughout the app.
+    ///
+    /// This may be called multiple times within a single process.
+    ///
+    /// Re-warming helps ensure the NSE sees the same state as the Main App.
+    @MainActor
+    func warmCaches(appReadiness: AppReadiness, dependenciesBridge: DependenciesBridge) {
+        // Note: All of these methods must be safe to invoke repeatedly.
+
+        self.verifyPniAndPniIdentityKey(dependenciesBridge: dependenciesBridge)
+        self.fixLocalRecipientIfNeeded(dependenciesBridge: dependenciesBridge)
+        ZonaRosaProxy.warmCaches(appReadiness: appReadiness)
+        self.zonarosaServiceRef.warmCaches()
+        self.profileManagerRef.warmCaches()
+        dependenciesBridge.svr.warmCaches()
+        self.typingIndicatorsRef.warmCaches()
+        self.paymentsHelperRef.warmCaches()
+        self.paymentsCurrenciesRef.warmCaches()
+        StoryManager.setup(appReadiness: appReadiness)
+        dependenciesBridge.db.read { tx in appExpiryRef.warmCaches(with: tx) }
+    }
+
+    @MainActor
+    private func verifyPniAndPniIdentityKey(dependenciesBridge: DependenciesBridge) {
+        let databaseStorage = self.databaseStorageRef
+        let tsAccountManager = dependenciesBridge.tsAccountManager
+
+        let mustHavePni: Bool
+        let mustHavePniIdentityKey: Bool
+        switch tsAccountManager.registrationStateWithMaybeSneakyTransaction {
+        case .provisioned:
+            mustHavePni = true
+            mustHavePniIdentityKey = true
+        case .registered:
+            mustHavePni = true
+            mustHavePniIdentityKey = true
+        default:
+            mustHavePni = false
+            mustHavePniIdentityKey = false
+        }
+
+        guard mustHavePni || mustHavePniIdentityKey else {
+            return
+        }
+
+        let (hasPni, hasPniIdentityKey) = databaseStorage.read { tx -> (Bool, Bool) in
+            let hasPni = tsAccountManager.localIdentifiers(tx: tx)!.pni != nil
+            let hasPniIdentityKey = dependenciesBridge.identityManager.identityKeyPair(for: .pni, tx: tx) != nil
+            return (hasPni, hasPniIdentityKey)
+        }
+
+        if (!hasPni && mustHavePni) || (!hasPniIdentityKey && mustHavePniIdentityKey) {
+            Logger.warn("Deregistering because PNI state is missing (hasPni: \(hasPni); hasPniIdentityKey: \(hasPniIdentityKey))")
+            databaseStorage.write { tx in
+                dependenciesBridge.registrationStateChangeManager.setIsDeregisteredOrDelinked(true, tx: tx)
+            }
+        }
+    }
+
+    /// Ensures the local ZonaRosaRecipient is correct.
+    ///
+    /// This primarily serves to ensure the local ZonaRosaRecipient has its own
+    /// Pni (a one-time migration), but it also helps ensure that the value is
+    /// always consistent with TSAccountManager's values.
+    private func fixLocalRecipientIfNeeded(dependenciesBridge: DependenciesBridge) {
+        let blockedRecipientStore = dependenciesBridge.blockedRecipientStore
+        let databaseStorage = self.databaseStorageRef
+        let recipientMerger = dependenciesBridge.recipientMerger
+        let tsAccountManager = dependenciesBridge.tsAccountManager
+
+        databaseStorage.write { tx in
+            guard let localIdentifiers = tsAccountManager.localIdentifiers(tx: tx) else {
+                return // Not registered yet.
+            }
+            guard let phoneNumber = E164(localIdentifiers.phoneNumber) else {
+                return // Registered with an invalid phone number.
+            }
+            let localRecipient = recipientMerger.applyMergeForLocalAccount(
+                aci: localIdentifiers.aci,
+                phoneNumber: phoneNumber,
+                pni: localIdentifiers.pni,
+                tx: tx,
+            )
+            blockedRecipientStore.setBlocked(false, recipientId: localRecipient.id, tx: tx)
+        }
+    }
+
+#if TESTABLE_BUILD
+
+    public func setContactManagerForUnitTests(_ contactManager: any ContactManager) {
+        self.contactManagerRef = contactManager
+    }
+
+    public func setMessageSenderForUnitTests(_ messageSender: MessageSender) {
+        self.messageSenderRef = messageSender
+    }
+
+    public func setNetworkManagerForUnitTests(_ networkManager: NetworkManager) {
+        self.networkManagerRef = networkManager
+    }
+
+    public func setPaymentsHelperForUnitTests(_ paymentsHelper: PaymentsHelperSwift) {
+        self.paymentsHelperRef = paymentsHelper
+    }
+
+    public func setGroupsV2ForUnitTests(_ groupsV2: GroupsV2) {
+        self.groupsV2Ref = groupsV2
+    }
+
+#endif
+}

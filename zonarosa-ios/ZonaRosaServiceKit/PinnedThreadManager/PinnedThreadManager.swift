@@ -1,0 +1,50 @@
+//
+// Copyright 2023 ZonaRosa Platform
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+import Foundation
+
+public enum PinnedThreads {
+    public static var maxPinnedThreads: UInt {
+        RemoteConfig.current.pinnedThreadLimit
+    }
+}
+
+public protocol PinnedThreadManager {
+
+    func pinnedThreadIds(tx: DBReadTransaction) -> [String]
+
+    func pinnedThreads(tx: DBReadTransaction) -> [TSThread]
+
+    func isThreadPinned(_ thread: TSThread, tx: DBReadTransaction) -> Bool
+
+    func updatePinnedThreadIds(
+        _ pinnedThreadIds: [String],
+        updateStorageService: Bool,
+        tx: DBWriteTransaction,
+    )
+
+    func pinThread(
+        _ thread: TSThread,
+        updateStorageService: Bool,
+        tx: DBWriteTransaction,
+    ) throws
+
+    func unpinThread(
+        _ thread: TSThread,
+        updateStorageService: Bool,
+        tx: DBWriteTransaction,
+    ) throws
+
+    func handleUpdatedThread(_ thread: TSThread, tx: DBWriteTransaction)
+}
+
+@objc
+public class PinnedThreadManagerObjcBridge: NSObject {
+
+    @objc
+    static func handleUpdatedThread(_ thread: TSThread, transaction: DBWriteTransaction) {
+        DependenciesBridge.shared.pinnedThreadManager.handleUpdatedThread(thread, tx: transaction)
+    }
+}

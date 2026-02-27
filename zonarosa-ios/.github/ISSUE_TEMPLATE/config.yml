@@ -1,0 +1,20 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📃 Support Center
+    url: https://support.zonarosa.io/
+    about: Find answers to many common questions.
+  - name: ✨ Feature request
+    url: https://community.zonarosausers.org/c/feature-requests/ios-feature-requests/
+    about: Missing something in ZonaRosa? Let us know.
+  - name: 💬 Community support
+    url: https://community.zonarosausers.org/c/support/
+    about: Feel free to ask anything.
+  - name: 📖 Developer documentation
+    url: https://zonarosa.io/docs/
+    about: Official ZonaRosa developer documentation.
+  - name: 📚 Translation feedback.
+    url: https://community.zonarosausers.org/c/translation-feedback/
+    about: Share feedback on translations.
+  - name: ❓ Other issue?
+    url: https://community.zonarosausers.org/
+    about: Search on the community forums.

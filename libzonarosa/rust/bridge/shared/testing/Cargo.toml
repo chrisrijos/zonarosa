@@ -1,0 +1,54 @@
+#
+# Copyright (C) 2024 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-bridge-testing"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+attest = { workspace = true }
+libzonarosa-bridge-macros = { workspace = true }
+libzonarosa-bridge-types = { workspace = true }
+libzonarosa-core = { workspace = true }
+libzonarosa-keytrans = { workspace = true }
+libzonarosa-message-backup = { workspace = true, features = ["json"] }
+libzonarosa-net = { workspace = true }
+libzonarosa-net-chat = { workspace = true }
+libzonarosa-protocol = { workspace = true }
+
+base64 = { workspace = true }
+boring-zonarosa = { workspace = true }
+bytes = { workspace = true }
+const-str = { workspace = true }
+derive_more = { workspace = true }
+futures-util = { workspace = true }
+hex = { workspace = true }
+http = { workspace = true }
+nonzero_ext = { workspace = true }
+paste = { workspace = true }
+prost = { workspace = true }
+rand = { workspace = true }
+scopeguard = { workspace = true }
+serde_json = { workspace = true }
+strum = { workspace = true, features = ["derive"] }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+jni = { workspace = true, optional = true }
+linkme = { workspace = true, optional = true }
+neon = { workspace = true, optional = true, default-features = false, features = ["napi-6"] }
+
+[features]
+ffi = ["libzonarosa-bridge-types/ffi"]
+jni = ["dep:jni", "libzonarosa-bridge-types/jni"]
+node = ["dep:linkme", "dep:neon", "libzonarosa-bridge-types/node"]
+zonarosa-media = ["libzonarosa-bridge-types/zonarosa-media"]

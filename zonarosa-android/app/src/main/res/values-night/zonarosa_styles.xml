@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="ZonaRosa.DayNight.Popup" parent="@style/ThemeOverlay.AppCompat.Dark" />
+
+    <style name="ZonaRosa.DayNight.Toolbar.Overflow" parent="@style/ZonaRosa.Toolbar.Overflow" />
+</resources>

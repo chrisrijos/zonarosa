@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:viewBindingIgnore="true"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/zonarosa_background_primary">
+
+        <io.zonarosa.messenger.util.views.DarkOverflowToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:navigationIcon="@drawable/symbol_arrow_start_24"
+            app:title="@string/DonationReceiptListFragment__all_activity" />
+
+        <io.zonarosa.messenger.components.ControllableTabLayout
+            android:id="@+id/tabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:tabIndicatorColor="@color/zonarosa_inverse_primary"
+            app:tabIndicatorFullWidth="false"
+            app:tabSelectedTextColor="@color/zonarosa_text_primary"
+            app:tabTextAppearance="@style/TextAppearance.ZonaRosa.Body2"
+            app:tabTextColor="@color/zonarosa_text_secondary" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

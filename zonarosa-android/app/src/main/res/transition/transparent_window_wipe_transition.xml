@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<transitionSet>
+    <transition class="io.zonarosa.messenger.animation.transitions.CircleAvatarTransition" />
+
+    <transition class="io.zonarosa.messenger.animation.transitions.WipeDownTransition" />
+</transitionSet>

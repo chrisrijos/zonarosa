@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosa користи Apple Music за пуштање медија из прилога.";
+NSCameraUsageDescription = "ZonaRosa користи вашу камеру за снимање фотографија и за видео позиве.";
+NSContactsUsageDescription = "ZonaRosa користи ваше контакте да пронађе људе које познајете. Ваше контакте не складиштимо на серверу.";
+NSFaceIDUsageDescription = "ZonaRosa-ово закључавање екрана користи Face ID.";
+NSLocationWhenInUseUsageDescription = "ZonaRosa-у је потребан приступ вашој локацији да бисте могли да поделите тренутну локацију.";
+NSMicrophoneUsageDescription = "ZonaRosa-у је потребан приступ микрофону за позиве и снимање гласовних порука.";
+NSPhotoLibraryAddUsageDescription = "ZonaRosa ће сачувати слике у вашој галерији.";
+NSPhotoLibraryUsageDescription = "ZonaRosa вам омогућава избор слика за слање из ваше галерије.";
+NSLocalNetworkUsageDescription = "ZonaRosa користи локалну мрежу да би вам омогућио да директно пребаците налог на нови телефон. Неће се користити осим ако изричито не одлучите да започнете пренос на нови уређај.";

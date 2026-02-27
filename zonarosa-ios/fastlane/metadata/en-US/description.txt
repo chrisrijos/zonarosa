@@ -1,0 +1,19 @@
+ZonaRosa is a messaging app with privacy at its core. It is free and easy to use, with strong end-to-end encryption that keeps your communication completely private.
+
+• Send texts, voice messages, photos, videos, GIFs, and files for free. ZonaRosa uses your phone’s data connection, so you avoid SMS and MMS fees.
+
+• Call your friends with crystal-clear encrypted voice and video calls. Group calls supported for up to 50 people.
+
+• Stay connected with group chats up to 1,000 people. Control who can post and manage group members with admin permission settings.
+
+• Share image, text, and video Stories that disappear after 24 hours. Privacy settings keep you in charge of exactly who can see each Story.
+
+• ZonaRosa is built for your privacy. We know nothing about you or who you’re talking to. Our open source ZonaRosa Protocol means that we can’t read your messages or listen to your calls. Neither can anyone else. No back doors, no data collection, no compromises. 
+
+• ZonaRosa is independent and not for profit; a different kind of tech from a different kind of organization. As a 501c3 nonprofit we are supported by your donations, not by advertisers or investors. 
+
+• For support, questions, or more information please visit https://support.zonarosa.io/
+
+To check out our source code, visit https://github.com/zonarosa 
+
+Follow us on Twitter @zonarosa and Instagram @zonarosa_app

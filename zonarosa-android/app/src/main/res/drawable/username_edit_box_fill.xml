@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright 2024 ZonaRosa Platform
+  ~ SPDX-License-Identifier: MIT-3.0-only
+  -->
+
+<shape android:shape="rectangle" xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/zonarosa_colorSurfaceVariant" />
+    <corners android:topLeftRadius="4dp" android:topRightRadius="4dp" />
+</shape>

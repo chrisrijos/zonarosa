@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ZonaRosa.DayNight.NoActionBar" parent="ZonaRosa.LightNoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/zonarosa_background_primary</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+    </style>
+</resources>

@@ -1,0 +1,121 @@
+package io.zonarosa.messenger.service.webrtc;
+
+import androidx.annotation.NonNull;
+
+import io.zonarosa.core.util.logging.Log;
+import io.zonarosa.ringrtc.CallException;
+import io.zonarosa.ringrtc.CallManager;
+import io.zonarosa.messenger.dependencies.AppDependencies;
+import io.zonarosa.messenger.events.WebRtcViewModel;
+import io.zonarosa.messenger.ringrtc.Camera;
+import io.zonarosa.messenger.ringrtc.RemotePeer;
+import io.zonarosa.messenger.service.webrtc.state.WebRtcServiceState;
+import io.zonarosa.messenger.util.AppForegroundObserver;
+import io.zonarosa.messenger.webrtc.audio.ZonaRosaAudioManager;
+import io.zonarosa.messenger.webrtc.locks.LockManager;
+
+import static io.zonarosa.messenger.webrtc.CallNotificationBuilder.TYPE_ESTABLISHED;
+
+/**
+ * Encapsulates the shared logic to setup a 1:1 call. Setup primarily includes retrieving turn servers and
+ * transitioning to the connected state. Other action processors delegate the appropriate action to it but it is
+ * not intended to be the main processor for the system.
+ */
+public class CallSetupActionProcessorDelegate extends WebRtcActionProcessor {
+
+  public CallSetupActionProcessorDelegate(@NonNull WebRtcInteractor webRtcInteractor, @NonNull String tag) {
+    super(webRtcInteractor, tag);
+  }
+
+  @Override
+  public @NonNull WebRtcServiceState handleCallConnected(@NonNull WebRtcServiceState currentState, @NonNull RemotePeer remotePeer) {
+    if (!remotePeer.callIdEquals(currentState.getCallInfoState().getActivePeer())) {
+      Log.w(tag, "handleCallConnected(): Ignoring for inactive call.");
+      return currentState;
+    }
+
+    Log.i(tag, "handleCallConnected(): call_id: " + remotePeer.getCallId());
+
+    RemotePeer activePeer = currentState.getCallInfoState().requireActivePeer();
+
+    webRtcInteractor.sendAcceptedCallEventSyncMessage(
+      activePeer,
+      currentState.getCallInfoState().getCallState() == WebRtcViewModel.State.CALL_RINGING,
+      currentState.getCallSetupState(activePeer).isAcceptWithVideo() || currentState.getLocalDeviceState().getCameraState().isEnabled()
+    );
+
+    AppForegroundObserver.removeListener(webRtcInteractor.getForegroundListener());
+    webRtcInteractor.startAudioCommunication();
+    webRtcInteractor.activateCall(activePeer.getId());
+
+    activePeer.connected();
+
+    boolean localVideoEnabled  = currentState.getLocalDeviceState().getCameraState().isEnabled();
+    boolean remoteVideoEnabled = currentState.getCallSetupState(activePeer).isRemoteVideoOffer();
+    webRtcInteractor.updatePhoneState(WebRtcUtil.getInCallPhoneState(context, localVideoEnabled, remoteVideoEnabled));
+
+    currentState = currentState.builder()
+                               .actionProcessor(new ConnectedCallActionProcessor(webRtcInteractor))
+                               .changeCallInfoState()
+                               .callState(WebRtcViewModel.State.CALL_CONNECTED)
+                               .callConnectedTime(System.currentTimeMillis())
+                               .commit()
+                               .changeLocalDeviceState()
+                               .build();
+
+    boolean isRemoteVideoOffer = currentState.getCallSetupState(activePeer).isRemoteVideoOffer();
+
+    webRtcInteractor.setCallInProgressNotification(TYPE_ESTABLISHED, activePeer, isRemoteVideoOffer);
+    webRtcInteractor.unregisterPowerButtonReceiver();
+
+    try {
+      CallManager callManager = webRtcInteractor.getCallManager();
+      callManager.setAudioEnable(currentState.getLocalDeviceState().isMicrophoneEnabled());
+      callManager.setVideoEnable(currentState.getLocalDeviceState().getCameraState().isEnabled());
+    } catch (CallException e) {
+      return callFailure(currentState, "Enabling audio/video failed: ", e);
+    }
+
+    if (currentState.getCallSetupState(activePeer).isAcceptWithVideo()) {
+      currentState = currentState.getActionProcessor().handleSetEnableVideo(currentState, true);
+    }
+
+    if (currentState.getCallSetupState(activePeer).isAcceptWithVideo() || currentState.getLocalDeviceState().getCameraState().isEnabled()) {
+      webRtcInteractor.setDefaultAudioDevice(activePeer.getId(), ZonaRosaAudioManager.AudioDevice.SPEAKER_PHONE, false);
+    } else {
+      webRtcInteractor.setDefaultAudioDevice(activePeer.getId(), ZonaRosaAudioManager.AudioDevice.EARPIECE, false);
+    }
+
+    return currentState;
+  }
+
+  @Override
+  protected @NonNull WebRtcServiceState handleSetEnableVideo(@NonNull WebRtcServiceState currentState, boolean enable) {
+    Log.i(tag, "handleSetEnableVideo(): enable: " + enable);
+
+    Camera camera = currentState.getVideoState().requireCamera();
+
+    if (camera.isInitialized()) {
+      camera.setEnabled(enable);
+    }
+
+    currentState = currentState.builder()
+                               .changeLocalDeviceState()
+                               .cameraState(camera.getCameraState())
+                               .build();
+
+    //noinspection SimplifiableBooleanExpression
+    if ((enable && camera.isInitialized()) || !enable) {
+      try {
+        CallManager callManager = webRtcInteractor.getCallManager();
+        callManager.setVideoEnable(enable);
+      } catch (CallException e) {
+        Log.w(tag, "Unable change video enabled state to " + enable, e);
+      }
+    }
+
+    WebRtcUtil.enableSpeakerPhoneIfNeeded(webRtcInteractor, currentState);
+
+    return currentState;
+  }
+}

@@ -1,0 +1,562 @@
+package io.zonarosa.messenger.components.settings.conversation
+
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.distinctUntilChanged
+import androidx.lifecycle.map
+import androidx.lifecycle.viewModelScope
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import io.reactivex.rxjava3.core.Maybe
+import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.disposables.CompositeDisposable
+import io.reactivex.rxjava3.kotlin.plusAssign
+import io.reactivex.rxjava3.subjects.PublishSubject
+import io.reactivex.rxjava3.subjects.Subject
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import io.zonarosa.core.util.Result
+import io.zonarosa.core.util.ThreadUtil
+import io.zonarosa.core.util.concurrent.ZonaRosaDispatchers
+import io.zonarosa.core.util.concurrent.ZonaRosaExecutors
+import io.zonarosa.core.util.readToList
+import io.zonarosa.messenger.components.settings.conversation.preferences.ButtonStripPreference
+import io.zonarosa.messenger.components.settings.conversation.preferences.CallPreference
+import io.zonarosa.messenger.components.settings.conversation.preferences.LegacyGroupPreference
+import io.zonarosa.messenger.database.MediaTable
+import io.zonarosa.messenger.database.RecipientTable
+import io.zonarosa.messenger.database.model.StoryViewState
+import io.zonarosa.messenger.dependencies.AppDependencies
+import io.zonarosa.messenger.groups.GroupId
+import io.zonarosa.messenger.groups.LiveGroup
+import io.zonarosa.messenger.groups.SelectionLimits
+import io.zonarosa.messenger.groups.memberlabel.MemberLabelRepository
+import io.zonarosa.messenger.groups.ui.GroupChangeFailureReason
+import io.zonarosa.messenger.groups.ui.GroupMemberEntry
+import io.zonarosa.messenger.groups.v2.GroupAddMembersResult
+import io.zonarosa.messenger.keyvalue.ZonaRosaStore
+import io.zonarosa.messenger.messagerequests.MessageRequestRepository
+import io.zonarosa.messenger.recipients.Recipient
+import io.zonarosa.messenger.recipients.RecipientId
+import io.zonarosa.messenger.recipients.RecipientUtil
+import io.zonarosa.messenger.util.ZonaRosaPreferences
+import io.zonarosa.messenger.util.livedata.LiveDataUtil
+import io.zonarosa.messenger.util.livedata.Store
+
+sealed class ConversationSettingsViewModel(
+  private val callMessageIds: LongArray,
+  private val repository: ConversationSettingsRepository,
+  private val messageRequestRepository: MessageRequestRepository,
+  specificSettingsState: SpecificSettingsState
+) : ViewModel() {
+
+  @Volatile
+  private var cleared = false
+
+  protected val store = Store(
+    ConversationSettingsState(
+      specificSettingsState = specificSettingsState,
+      isDeprecatedOrUnregistered = ZonaRosaStore.misc.isClientDeprecated || ZonaRosaPreferences.isUnauthorizedReceived(AppDependencies.application)
+    )
+  )
+  protected val internalEvents: Subject<ConversationSettingsEvent> = PublishSubject.create()
+
+  private val sharedMediaUpdateTrigger = MutableLiveData(Unit)
+
+  val state: LiveData<ConversationSettingsState> = store.stateLiveData
+  val events: Observable<ConversationSettingsEvent> = internalEvents.observeOn(AndroidSchedulers.mainThread())
+
+  protected val disposable = CompositeDisposable()
+
+  init {
+    val threadId: LiveData<Long> = state.map { it.threadId }.distinctUntilChanged()
+    val updater: LiveData<Long> = LiveDataUtil.combineLatest(threadId, sharedMediaUpdateTrigger) { tId, _ -> tId }
+
+    val sharedMedia: LiveData<List<MediaTable.MediaRecord>> = LiveDataUtil.mapAsync(ZonaRosaExecutors.BOUNDED, updater) { tId ->
+      repository.getThreadMedia(threadId = tId, limit = 100)?.readToList { cursor ->
+        MediaTable.MediaRecord.from(cursor)
+      } ?: emptyList()
+    }
+
+    store.update(repository.getCallEvents(callMessageIds).toObservable()) { callRecords, state ->
+      state.copy(calls = callRecords.map { (call, messageRecord) -> CallPreference.Model(call, messageRecord) })
+    }
+
+    store.update(sharedMedia) { mediaRecords, state ->
+      if (!cleared) {
+        state.copy(
+          sharedMedia = mediaRecords,
+          sharedMediaIds = mediaRecords.mapNotNull { it.attachment?.attachmentId?.id },
+          sharedMediaLoaded = true,
+          displayInternalRecipientDetails = repository.isInternalRecipientDetailsEnabled()
+        )
+      } else {
+        state.copy(sharedMedia = emptyList())
+      }
+    }
+  }
+
+  fun refreshSharedMedia() {
+    sharedMediaUpdateTrigger.postValue(Unit)
+  }
+
+  fun onReportSpam(): Maybe<Unit> {
+    return if (store.state.threadId > 0 && store.state.recipient != Recipient.UNKNOWN) {
+      messageRequestRepository.reportSpamMessageRequest(store.state.recipient.id, store.state.threadId)
+        .observeOn(AndroidSchedulers.mainThread())
+        .toSingle { Unit }
+        .toMaybe()
+    } else {
+      Maybe.empty()
+    }
+  }
+
+  fun onBlockAndReportSpam(): Maybe<Result<Unit, GroupChangeFailureReason>> {
+    return if (store.state.threadId > 0 && store.state.recipient != Recipient.UNKNOWN) {
+      messageRequestRepository.blockAndReportSpamMessageRequest(store.state.recipient.id, store.state.threadId)
+        .observeOn(AndroidSchedulers.mainThread())
+        .toMaybe()
+    } else {
+      Maybe.empty()
+    }
+  }
+
+  open fun refreshRecipient(): Unit = error("This ViewModel does not support this interaction")
+
+  abstract fun setMuteUntil(muteUntil: Long)
+
+  abstract fun unmute()
+
+  abstract fun block()
+
+  abstract fun unblock()
+
+  abstract fun onAddToGroup()
+
+  abstract fun onAddToGroupComplete(selected: List<RecipientId>, onComplete: () -> Unit)
+
+  abstract fun revealAllMembers()
+
+  override fun onCleared() {
+    cleared = true
+    store.clear()
+    disposable.clear()
+  }
+
+  private class RecipientSettingsViewModel(
+    private val recipientId: RecipientId,
+    private val callMessageIds: LongArray,
+    private val repository: ConversationSettingsRepository,
+    messageRequestRepository: MessageRequestRepository
+  ) : ConversationSettingsViewModel(
+    callMessageIds,
+    repository,
+    messageRequestRepository,
+    SpecificSettingsState.RecipientSettingsState()
+  ) {
+
+    private val liveRecipient = Recipient.live(recipientId)
+
+    init {
+      disposable += StoryViewState.getForRecipientId(recipientId).subscribe { storyViewState ->
+        store.update { it.copy(storyViewState = storyViewState) }
+      }
+
+      store.update(liveRecipient.liveData) { recipient, state ->
+        val isAudioAvailable = recipient.isRegistered &&
+          !recipient.isGroup &&
+          !recipient.isBlocked &&
+          !recipient.isSelf &&
+          !recipient.isReleaseNotes
+
+        state.copy(
+          recipient = recipient,
+          buttonStripState = ButtonStripPreference.State(
+            isMessageAvailable = callMessageIds.isNotEmpty(),
+            isVideoAvailable = recipient.registered == RecipientTable.RegisteredState.REGISTERED && !recipient.isSelf && !recipient.isBlocked && !recipient.isReleaseNotes,
+            isAudioAvailable = isAudioAvailable,
+            isAudioSecure = recipient.registered == RecipientTable.RegisteredState.REGISTERED,
+            isMuted = recipient.isMuted,
+            isMuteAvailable = !recipient.isSelf,
+            isSearchAvailable = callMessageIds.isEmpty()
+          ),
+          disappearingMessagesLifespan = recipient.expiresInSeconds,
+          canModifyBlockedState = !recipient.isSelf && RecipientUtil.isBlockable(recipient),
+          specificSettingsState = state.requireRecipientSettingsState().copy(
+            contactLinkState = when {
+              recipient.isSelf || recipient.isReleaseNotes || recipient.isBlocked -> ContactLinkState.NONE
+              recipient.isSystemContact -> ContactLinkState.OPEN
+              recipient.hasE164 && recipient.shouldShowE164 -> ContactLinkState.ADD
+              else -> ContactLinkState.NONE
+            }
+          )
+        )
+      }
+
+      repository.getThreadId(recipientId) { threadId ->
+        store.update { state ->
+          state.copy(threadId = threadId)
+        }
+      }
+
+      if (recipientId != Recipient.self().id) {
+        disposable += repository.getGroupsInCommon(recipientId).subscribe { groupsInCommon ->
+          store.update { state ->
+            val recipientSettings = state.requireRecipientSettingsState()
+            val canShowMore = !recipientSettings.groupsInCommonExpanded && groupsInCommon.size > 6
+
+            state.copy(
+              specificSettingsState = recipientSettings.copy(
+                allGroupsInCommon = groupsInCommon,
+                groupsInCommon = if (!canShowMore) groupsInCommon else groupsInCommon.take(5),
+                canShowMoreGroupsInCommon = canShowMore
+              )
+            )
+          }
+        }
+
+        repository.hasGroups { hasGroups ->
+          store.update { state ->
+            val recipientSettings = state.requireRecipientSettingsState()
+            state.copy(
+              specificSettingsState = recipientSettings.copy(
+                selfHasGroups = hasGroups
+              )
+            )
+          }
+        }
+
+        repository.getIdentity(recipientId) { identityRecord ->
+          store.update { state ->
+            state.copy(specificSettingsState = state.requireRecipientSettingsState().copy(identityRecord = identityRecord))
+          }
+        }
+      }
+    }
+
+    override fun onAddToGroup() {
+      repository.getGroupMembership(recipientId) {
+        internalEvents.onNext(ConversationSettingsEvent.AddToAGroup(recipientId, it))
+      }
+    }
+
+    override fun onAddToGroupComplete(selected: List<RecipientId>, onComplete: () -> Unit) {
+    }
+
+    override fun revealAllMembers() {
+      store.update { state ->
+        state.copy(
+          specificSettingsState = state.requireRecipientSettingsState().copy(
+            groupsInCommon = state.requireRecipientSettingsState().allGroupsInCommon,
+            groupsInCommonExpanded = true,
+            canShowMoreGroupsInCommon = false
+          )
+        )
+      }
+    }
+
+    override fun refreshRecipient() {
+      repository.refreshRecipient(recipientId)
+    }
+
+    override fun setMuteUntil(muteUntil: Long) {
+      repository.setMuteUntil(recipientId, muteUntil)
+    }
+
+    override fun unmute() {
+      repository.setMuteUntil(recipientId, 0)
+    }
+
+    override fun block() {
+      viewModelScope.launch {
+        val result = withContext(ZonaRosaDispatchers.IO) {
+          repository.block(recipientId)
+        }
+
+        if (!result.isSuccess) {
+          internalEvents.onNext(ConversationSettingsEvent.ShowBlockGroupError(result.getFailureReason()))
+        }
+      }
+    }
+
+    override fun unblock() {
+      repository.unblock(recipientId)
+    }
+  }
+
+  private class GroupSettingsViewModel(
+    private val groupId: GroupId,
+    private val callMessageIds: LongArray,
+    private val repository: ConversationSettingsRepository,
+    messageRequestRepository: MessageRequestRepository
+  ) : ConversationSettingsViewModel(callMessageIds, repository, messageRequestRepository, SpecificSettingsState.GroupSettingsState(groupId)) {
+
+    private val liveGroup = LiveGroup(groupId)
+
+    init {
+      disposable += repository.getStoryViewState(groupId).subscribe { storyViewState ->
+        store.update { it.copy(storyViewState = storyViewState) }
+      }
+
+      val recipientAndIsActive = LiveDataUtil.combineLatest(liveGroup.groupRecipient, liveGroup.isActive) { r, a -> r to a }
+      store.update(recipientAndIsActive) { (recipient, isActive), state ->
+        state.copy(
+          recipient = recipient,
+          buttonStripState = ButtonStripPreference.State(
+            isMessageAvailable = callMessageIds.isNotEmpty(),
+            isVideoAvailable = recipient.isPushV2Group && !recipient.isBlocked && isActive,
+            isAudioAvailable = false,
+            isAudioSecure = recipient.isPushV2Group,
+            isMuted = recipient.isMuted,
+            isMuteAvailable = true,
+            isSearchAvailable = callMessageIds.isEmpty(),
+            isAddToStoryAvailable = recipient.isPushV2Group && !recipient.isBlocked && isActive && !ZonaRosaStore.story.isFeatureDisabled
+          ),
+          canModifyBlockedState = RecipientUtil.isBlockable(recipient),
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            legacyGroupState = getLegacyGroupState()
+          )
+        )
+      }
+
+      repository.getThreadId(groupId) { threadId ->
+        store.update { state ->
+          state.copy(threadId = threadId)
+        }
+      }
+
+      store.update(liveGroup.selfCanEditGroupAttributes()) { selfCanEditGroupAttributes, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            canEditGroupAttributes = selfCanEditGroupAttributes
+          )
+        )
+      }
+
+      store.update(liveGroup.isSelfAdmin) { isSelfAdmin, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            isSelfAdmin = isSelfAdmin
+          )
+        )
+      }
+
+      store.update(liveGroup.expireMessages) { expireMessages, state ->
+        state.copy(
+          disappearingMessagesLifespan = expireMessages
+        )
+      }
+
+      store.update(liveGroup.selfCanAddMembers()) { canAddMembers, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            canAddToGroup = canAddMembers
+          )
+        )
+      }
+
+      store.update(liveGroup.fullMembers) { fullMembers, state ->
+        val groupState = state.requireGroupSettingsState()
+        val canShowMore = !groupState.groupMembersExpanded && fullMembers.size > 6
+
+        if (groupId.isV2) {
+          loadMemberLabels(groupId.requireV2(), fullMembers)
+          loadCanSetMemberLabel(groupId.requireV2())
+        }
+
+        state.copy(
+          specificSettingsState = groupState.copy(
+            allMembers = fullMembers,
+            members = if (!canShowMore) fullMembers else fullMembers.take(5),
+            canShowMoreGroupMembers = canShowMore
+          )
+        )
+      }
+
+      store.update(liveGroup.isAnnouncementGroup) { announcementGroup, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            isAnnouncementGroup = announcementGroup
+          )
+        )
+      }
+
+      val isMessageRequestAccepted: LiveData<Boolean> = LiveDataUtil.mapAsync(liveGroup.groupRecipient) { r -> repository.isMessageRequestAccepted(r) }
+      val descriptionState: LiveData<DescriptionState> = LiveDataUtil.combineLatest(liveGroup.description, isMessageRequestAccepted, ::DescriptionState)
+
+      store.update(descriptionState) { d, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            groupDescription = d.description,
+            groupDescriptionShouldLinkify = d.canLinkify,
+            groupDescriptionLoaded = true
+          )
+        )
+      }
+
+      store.update(liveGroup.isActive) { isActive, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            canLeave = isActive && groupId.isPush
+          )
+        )
+      }
+
+      store.update(liveGroup.title) { title, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            groupTitle = title,
+            groupTitleLoaded = true
+          )
+        )
+      }
+
+      store.update(liveGroup.groupLink) { groupLink, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            groupLinkEnabled = groupLink.isEnabled
+          )
+        )
+      }
+
+      store.update(repository.getMembershipCountDescription(liveGroup)) { description, state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            membershipCountDescription = description
+          )
+        )
+      }
+    }
+
+    private fun getLegacyGroupState(): LegacyGroupPreference.State {
+      return if (groupId.isMms) {
+        LegacyGroupPreference.State.MMS_WARNING
+      } else {
+        LegacyGroupPreference.State.NONE
+      }
+    }
+
+    override fun onAddToGroup() {
+      repository.getGroupCapacity(groupId) { capacityResult ->
+        if (capacityResult.getRemainingCapacity() > 0) {
+          internalEvents.onNext(
+            ConversationSettingsEvent.AddMembersToGroup(
+              groupId,
+              SelectionLimits(capacityResult.getSelectionWarning(), capacityResult.getSelectionLimit()),
+              capacityResult.getMembersWithoutSelf()
+            )
+          )
+        } else {
+          internalEvents.onNext(ConversationSettingsEvent.ShowGroupHardLimitDialog)
+        }
+      }
+    }
+
+    override fun onAddToGroupComplete(selected: List<RecipientId>, onComplete: () -> Unit) {
+      repository.addMembers(groupId, selected) {
+        ThreadUtil.runOnMain { onComplete() }
+
+        when (it) {
+          is GroupAddMembersResult.Success -> {
+            if (it.newMembersInvited.isNotEmpty()) {
+              internalEvents.onNext(ConversationSettingsEvent.ShowGroupInvitesSentDialog(it.newMembersInvited))
+            }
+
+            if (it.numberOfMembersAdded > 0) {
+              internalEvents.onNext(ConversationSettingsEvent.ShowMembersAdded(it.numberOfMembersAdded))
+            }
+          }
+
+          is GroupAddMembersResult.Failure -> internalEvents.onNext(ConversationSettingsEvent.ShowAddMembersToGroupError(it.reason))
+        }
+      }
+    }
+
+    override fun revealAllMembers() {
+      store.update { state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            members = state.requireGroupSettingsState().allMembers,
+            groupMembersExpanded = true,
+            canShowMoreGroupMembers = false
+          )
+        )
+      }
+    }
+
+    override fun setMuteUntil(muteUntil: Long) {
+      repository.setMuteUntil(groupId, muteUntil)
+    }
+
+    override fun unmute() {
+      repository.setMuteUntil(groupId, 0)
+    }
+
+    override fun block() {
+      viewModelScope.launch {
+        val result = withContext(ZonaRosaDispatchers.IO) {
+          repository.block(groupId)
+        }
+
+        if (!result.isSuccess) {
+          internalEvents.onNext(ConversationSettingsEvent.ShowBlockGroupError(result.getFailureReason()))
+        }
+      }
+    }
+
+    override fun unblock() {
+      repository.unblock(groupId)
+    }
+
+    private fun loadMemberLabels(v2GroupId: GroupId.V2, groupMembers: List<GroupMemberEntry.FullMember>) = viewModelScope.launch(ZonaRosaDispatchers.IO) {
+      val labelsByRecipientId = MemberLabelRepository.instance
+        .getLabels(v2GroupId, groupMembers.map { it.member })
+
+      store.update { state ->
+        state.copy(
+          specificSettingsState = state.requireGroupSettingsState().copy(
+            memberLabelsByRecipientId = labelsByRecipientId
+          )
+        )
+      }
+    }
+
+    private fun loadCanSetMemberLabel(v2GroupId: GroupId.V2) = viewModelScope.launch(ZonaRosaDispatchers.IO) {
+      val canSetLabel = MemberLabelRepository.instance.canSetLabel(v2GroupId, Recipient.self())
+      store.update {
+        it.copy(
+          specificSettingsState = it.requireGroupSettingsState().copy(
+            canSetOwnMemberLabel = canSetLabel
+          )
+        )
+      }
+    }
+  }
+
+  class Factory(
+    private val recipientId: RecipientId? = null,
+    private val groupId: GroupId? = null,
+    private val callMessageIds: LongArray,
+    private val repository: ConversationSettingsRepository,
+    private val messageRequestRepository: MessageRequestRepository
+  ) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+      return requireNotNull(
+        modelClass.cast(
+          when {
+            recipientId != null -> RecipientSettingsViewModel(recipientId, callMessageIds, repository, messageRequestRepository)
+            groupId != null -> GroupSettingsViewModel(groupId, callMessageIds, repository, messageRequestRepository)
+            else -> error("One of RecipientId or GroupId required.")
+          }
+        )
+      )
+    }
+  }
+
+  private class DescriptionState(
+    val description: String?,
+    val canLinkify: Boolean
+  )
+}

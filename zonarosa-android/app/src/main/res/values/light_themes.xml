@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="ZonaRosa.DayNight" parent="ZonaRosa.LightTheme" />
+
+    <style name="ZonaRosa.DayNight.NoActionBar" parent="ZonaRosa.LightNoActionBar" />
+
+    <style name="ZonaRosa.DayNight.Invite" parent="ZonaRosa.Light.NoActionBar.Invite" />
+
+    <style name="ZonaRosa.DayNight.IntroTheme" parent="ZonaRosa.LightIntroTheme" />
+
+    <style name="ZonaRosa.DayNight.DarkActionBar" parent="ZonaRosa.LightTheme.Conversation" />
+
+    <style name="ZonaRosa.DayNight.DarkNoActionBar" parent="ZonaRosa.LightNoActionBar.DarkToolbar" />
+
+    <style name="ZonaRosa.DayNight.Registration" parent="ZonaRosa.LightRegistrationTheme" />
+
+    <style name="ZonaRosa.DayNight.WallpaperCropper" parent="Theme.ZonaRosa.WallpaperCropper.Light" />
+
+    <style name="ZonaRosa.DayNight.BottomSheet.Rounded" parent="Theme.ZonaRosa.RoundedBottomSheet.Light" />
+
+    <style name="ZonaRosa.DayNight.ConversationSettings" parent="ZonaRosa.LightNoActionBar.ConversationSettings" />
+</resources>

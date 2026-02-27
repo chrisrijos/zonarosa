@@ -1,0 +1,24 @@
+#
+# Copyright 2025 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-cli-utils"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+edition = "2024"
+rust-version = "1.85"
+
+[lints]
+workspace = true
+
+[dependencies]
+libzonarosa-core = { workspace = true }
+
+base64 = { workspace = true }
+clap-stdin = { workspace = true }
+displaydoc = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }

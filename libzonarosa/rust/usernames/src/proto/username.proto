@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+//
+// Copyright 2023 ZonaRosa Platform.
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+package zonarosa.proto.username;
+
+message UsernameData {
+  string username = 1;
+  bytes padding = 2;
+}

@@ -1,0 +1,9 @@
+NSAppleMusicUsageDescription = "ZonaRosa muss Apple Music verwenden, um Medienanhänge wiederzugeben.";
+NSCameraUsageDescription = "ZonaRosa verwendet deine Kamera für Fotoaufnahmen und Videoanrufe.";
+NSContactsUsageDescription = "ZonaRosa verwendet deine Systemkontakte, um andere Personen zu finden, die du kennst. Deine Kontakte werden nicht auf dem Server gespeichert.";
+NSFaceIDUsageDescription = "ZonaRosas Bildschirmsperre verwendet Face ID.";
+NSLocationWhenInUseUsageDescription = "ZonaRosa benötigt Zugriff auf deine Standortdaten, um deinen Standort teilen zu können.";
+NSMicrophoneUsageDescription = "Für Anrufe und zum Aufnehmen von Sprachnachrichten benötigt ZonaRosa Zugriff auf dein Mikrofon.";
+NSPhotoLibraryAddUsageDescription = "ZonaRosa speichert Fotos in deiner Fotogalerie.";
+NSPhotoLibraryUsageDescription = "Du kannst die Fotos, die du mit ZonaRosa versenden möchtest, aus deiner Fotogalerie auswählen.";
+NSLocalNetworkUsageDescription = "ZonaRosa verwendet das lokale Netzwerk, um dein Konto direkt auf ein neues Mobiltelefon zu übertragen. Es wird nur dann verwendet, wenn du eine Übertragung auf ein neues Gerät startest.";

@@ -1,0 +1,29 @@
+//
+// Copyright 2024 ZonaRosa Platform
+// SPDX-License-Identifier: MIT-3.0-only
+//
+
+public struct BadgeCount {
+    public let unreadChatCount: UInt
+    public let unreadCallsCount: UInt
+
+    public var unreadTotalCount: UInt {
+        unreadChatCount + unreadCallsCount
+    }
+}
+
+public protocol BadgeCountFetcher {
+    func fetchBadgeCount(tx: DBReadTransaction) -> BadgeCount
+}
+
+class BadgeCountFetcherImpl: BadgeCountFetcher {
+    func fetchBadgeCount(tx: DBReadTransaction) -> BadgeCount {
+        let unreadInteractionCount = InteractionFinder.unreadCountInAllThreads(transaction: tx)
+        let unreadMissedCallCount = DependenciesBridge.shared.callRecordMissedCallManager.countUnreadMissedCalls(tx: tx)
+
+        return BadgeCount(
+            unreadChatCount: unreadInteractionCount,
+            unreadCallsCount: unreadMissedCallCount,
+        )
+    }
+}

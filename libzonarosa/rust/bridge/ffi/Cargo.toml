@@ -1,0 +1,47 @@
+#
+# Copyright (C) 2020-2021 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-ffi"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition = "2024"
+
+[lints]
+workspace = true
+
+[lib]
+name = "zonarosa_ffi"
+crate-type = ["staticlib"]
+
+[features]
+# Testing the Swift side of this requires compiling with ZONAROSA_MEDIA_SUPPORTED enabled for both Swift and C:
+#     swift test -Xswiftc -DZONAROSA_MEDIA_SUPPORTED -Xcc -DZONAROSA_MEDIA_SUPPORTED
+zonarosa-media = ["libzonarosa-bridge/zonarosa-media"]
+
+# Here for bridge_fn uniformity
+ffi = []
+default = ["ffi"]
+
+[dependencies]
+libzonarosa-bridge = { workspace = true, features = ["ffi"] }
+libzonarosa-bridge-macros = { workspace = true }
+libzonarosa-bridge-testing = { workspace = true, features = ["ffi"], optional = true }
+libzonarosa-core = { workspace = true }
+libzonarosa-net = { workspace = true }
+libzonarosa-net-chat = { workspace = true }
+libzonarosa-protocol = { workspace = true }
+zonarosa-media = { workspace = true }
+
+hex = { workspace = true }
+log = { workspace = true }
+log-panics = { workspace = true, features = ["with-backtrace"] }
+paste = { workspace = true }
+uuid = { workspace = true }
+zerocopy = { workspace = true }
+
+[target.aarch64-apple-ios.dependencies]
+cpufeatures = "0.2.6" # Make sure iOS gets optimized crypto.

@@ -1,0 +1,634 @@
+/*
+ * Copyright 2023 ZonaRosa Platform
+ * SPDX-License-Identifier: MIT-3.0-only
+ */
+
+package io.zonarosa.server.grpc;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyByte;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static io.zonarosa.server.grpc.GrpcTestUtils.assertRateLimitExceeded;
+import static io.zonarosa.server.grpc.GrpcTestUtils.assertStatusException;
+
+import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mock;
+import io.zonarosa.chat.common.EcPreKey;
+import io.zonarosa.chat.common.EcSignedPreKey;
+import io.zonarosa.chat.common.KemSignedPreKey;
+import io.zonarosa.chat.common.ServiceIdentifier;
+import io.zonarosa.chat.keys.AccountPreKeyBundles;
+import io.zonarosa.chat.keys.DevicePreKeyBundle;
+import io.zonarosa.chat.keys.GetPreKeyCountRequest;
+import io.zonarosa.chat.keys.GetPreKeyCountResponse;
+import io.zonarosa.chat.keys.GetPreKeysRequest;
+import io.zonarosa.chat.keys.GetPreKeysResponse;
+import io.zonarosa.chat.keys.KeysGrpc;
+import io.zonarosa.chat.keys.SetEcSignedPreKeyRequest;
+import io.zonarosa.chat.keys.SetKemLastResortPreKeyRequest;
+import io.zonarosa.chat.keys.SetOneTimeEcPreKeysRequest;
+import io.zonarosa.chat.keys.SetOneTimeKemSignedPreKeysRequest;
+import io.zonarosa.libzonarosa.protocol.IdentityKey;
+import io.zonarosa.libzonarosa.protocol.ecc.ECKeyPair;
+import io.zonarosa.server.controllers.RateLimitExceededException;
+import io.zonarosa.server.entities.ECPreKey;
+import io.zonarosa.server.entities.ECSignedPreKey;
+import io.zonarosa.server.entities.KEMSignedPreKey;
+import io.zonarosa.server.identity.AciServiceIdentifier;
+import io.zonarosa.server.identity.IdentityType;
+import io.zonarosa.server.identity.PniServiceIdentifier;
+import io.zonarosa.server.limits.RateLimiter;
+import io.zonarosa.server.limits.RateLimiters;
+import io.zonarosa.server.storage.Account;
+import io.zonarosa.server.storage.AccountsManager;
+import io.zonarosa.server.storage.Device;
+import io.zonarosa.server.storage.KeysManager;
+import io.zonarosa.server.tests.util.KeysHelper;
+import io.zonarosa.server.util.UUIDUtil;
+import reactor.core.publisher.Mono;
+
+class KeysGrpcServiceTest extends SimpleBaseGrpcTest<KeysGrpcService, KeysGrpc.KeysBlockingStub> {
+
+  private static final ECKeyPair ACI_IDENTITY_KEY_PAIR = ECKeyPair.generate();
+
+  private static final ECKeyPair PNI_IDENTITY_KEY_PAIR = ECKeyPair.generate();
+
+  protected static final UUID AUTHENTICATED_PNI = UUID.randomUUID();
+
+  @Mock
+  private AccountsManager accountsManager;
+
+  @Mock
+  private KeysManager keysManager;
+
+  @Mock
+  private RateLimiter preKeysRateLimiter;
+
+  @Mock
+  private Device authenticatedDevice;
+
+
+  @Override
+  protected KeysGrpcService createServiceBeforeEachTest() {
+    final RateLimiters rateLimiters = mock(RateLimiters.class);
+    when(rateLimiters.getPreKeysLimiter()).thenReturn(preKeysRateLimiter);
+
+    when(preKeysRateLimiter.validateReactive(anyString())).thenReturn(Mono.empty());
+
+    when(authenticatedDevice.getId()).thenReturn(AUTHENTICATED_DEVICE_ID);
+
+    final Account authenticatedAccount = mock(Account.class);
+    when(authenticatedAccount.getUuid()).thenReturn(AUTHENTICATED_ACI);
+    when(authenticatedAccount.getPhoneNumberIdentifier()).thenReturn(AUTHENTICATED_PNI);
+    when(authenticatedAccount.getIdentifier(IdentityType.ACI)).thenReturn(AUTHENTICATED_ACI);
+    when(authenticatedAccount.getIdentifier(IdentityType.PNI)).thenReturn(AUTHENTICATED_PNI);
+    when(authenticatedAccount.getIdentityKey(IdentityType.ACI)).thenReturn(new IdentityKey(ACI_IDENTITY_KEY_PAIR.getPublicKey()));
+    when(authenticatedAccount.getIdentityKey(IdentityType.PNI)).thenReturn(new IdentityKey(PNI_IDENTITY_KEY_PAIR.getPublicKey()));
+    when(authenticatedAccount.getDevice(AUTHENTICATED_DEVICE_ID)).thenReturn(Optional.of(authenticatedDevice));
+
+    when(accountsManager.getByAccountIdentifier(AUTHENTICATED_ACI)).thenReturn(Optional.of(authenticatedAccount));
+    when(accountsManager.getByPhoneNumberIdentifier(AUTHENTICATED_PNI)).thenReturn(Optional.of(authenticatedAccount));
+
+    when(accountsManager.getByAccountIdentifierAsync(AUTHENTICATED_ACI)).thenReturn(CompletableFuture.completedFuture(Optional.of(authenticatedAccount)));
+    when(accountsManager.getByPhoneNumberIdentifierAsync(AUTHENTICATED_PNI)).thenReturn(CompletableFuture.completedFuture(Optional.of(authenticatedAccount)));
+
+    return new KeysGrpcService(accountsManager, keysManager, rateLimiters);
+  }
+
+  @Test
+  void getPreKeyCount() {
+    when(keysManager.getEcCount(AUTHENTICATED_ACI, AUTHENTICATED_DEVICE_ID))
+        .thenReturn(CompletableFuture.completedFuture(1));
+
+    when(keysManager.getPqCount(AUTHENTICATED_ACI, AUTHENTICATED_DEVICE_ID))
+        .thenReturn(CompletableFuture.completedFuture(2));
+
+    when(keysManager.getEcCount(AUTHENTICATED_PNI, AUTHENTICATED_DEVICE_ID))
+        .thenReturn(CompletableFuture.completedFuture(3));
+
+    when(keysManager.getPqCount(AUTHENTICATED_PNI, AUTHENTICATED_DEVICE_ID))
+        .thenReturn(CompletableFuture.completedFuture(4));
+
+    assertEquals(GetPreKeyCountResponse.newBuilder()
+            .setAciEcPreKeyCount(1)
+            .setAciKemPreKeyCount(2)
+            .setPniEcPreKeyCount(3)
+            .setPniKemPreKeyCount(4)
+            .build(),
+        authenticatedServiceStub().getPreKeyCount(GetPreKeyCountRequest.newBuilder().build()));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = io.zonarosa.chat.common.IdentityType.class, names = {"IDENTITY_TYPE_ACI", "IDENTITY_TYPE_PNI"})
+  void setOneTimeEcPreKeys(final io.zonarosa.chat.common.IdentityType identityType) {
+    final List<ECPreKey> preKeys = new ArrayList<>();
+
+    for (int keyId = 0; keyId < 100; keyId++) {
+      preKeys.add(new ECPreKey(keyId, ECKeyPair.generate().getPublicKey()));
+    }
+
+    when(keysManager.storeEcOneTimePreKeys(any(), anyByte(), any()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    //noinspection ResultOfMethodCallIgnored
+    authenticatedServiceStub().setOneTimeEcPreKeys(SetOneTimeEcPreKeysRequest.newBuilder()
+        .setIdentityType(identityType)
+        .addAllPreKeys(preKeys.stream()
+            .map(preKey -> EcPreKey.newBuilder()
+                .setKeyId(preKey.keyId())
+                .setPublicKey(ByteString.copyFrom(preKey.serializedPublicKey()))
+                .build())
+            .toList())
+        .build());
+
+    final UUID expectedIdentifier = switch (IdentityTypeUtil.fromGrpcIdentityType(identityType)) {
+      case ACI -> AUTHENTICATED_ACI;
+      case PNI -> AUTHENTICATED_PNI;
+    };
+
+    verify(keysManager).storeEcOneTimePreKeys(expectedIdentifier, AUTHENTICATED_DEVICE_ID, preKeys);
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  void setOneTimeEcPreKeysWithError(final SetOneTimeEcPreKeysRequest request) {
+    assertStatusException(Status.INVALID_ARGUMENT, () -> authenticatedServiceStub().setOneTimeEcPreKeys(request));
+  }
+
+  private static Stream<Arguments> setOneTimeEcPreKeysWithError() {
+    final SetOneTimeEcPreKeysRequest prototypeRequest = SetOneTimeEcPreKeysRequest.newBuilder()
+        .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+        .addPreKeys(EcPreKey.newBuilder()
+            .setKeyId(1)
+            .setPublicKey(ByteString.copyFrom(ECKeyPair.generate().getPublicKey().serialize()))
+            .build())
+        .build();
+
+    return Stream.of(
+        // Missing identity type
+        Arguments.of(SetOneTimeEcPreKeysRequest.newBuilder(prototypeRequest)
+            .clearIdentityType()
+            .build()),
+
+        // Invalid public key
+        Arguments.of(SetOneTimeEcPreKeysRequest.newBuilder(prototypeRequest)
+            .setPreKeys(0, EcPreKey.newBuilder(prototypeRequest.getPreKeys(0))
+                .clearPublicKey()
+                .build())
+            .build()),
+
+        // No keys
+        Arguments.of(SetOneTimeEcPreKeysRequest.newBuilder(prototypeRequest)
+            .clearPreKeys()
+            .build())
+    );
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = io.zonarosa.chat.common.IdentityType.class, names = {"IDENTITY_TYPE_ACI", "IDENTITY_TYPE_PNI"})
+  void setOneTimeKemSignedPreKeys(final io.zonarosa.chat.common.IdentityType identityType) {
+    final ECKeyPair identityKeyPair = switch (IdentityTypeUtil.fromGrpcIdentityType(identityType)) {
+      case ACI -> ACI_IDENTITY_KEY_PAIR;
+      case PNI -> PNI_IDENTITY_KEY_PAIR;
+    };
+
+    final List<KEMSignedPreKey> preKeys = new ArrayList<>();
+
+    for (int keyId = 0; keyId < 100; keyId++) {
+      preKeys.add(KeysHelper.signedKEMPreKey(keyId, identityKeyPair));
+    }
+
+    when(keysManager.storeKemOneTimePreKeys(any(), anyByte(), any()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+
+    //noinspection ResultOfMethodCallIgnored
+    authenticatedServiceStub().setOneTimeKemSignedPreKeys(
+        SetOneTimeKemSignedPreKeysRequest.newBuilder()
+            .setIdentityType(identityType)
+            .addAllPreKeys(preKeys.stream()
+                .map(preKey -> KemSignedPreKey.newBuilder()
+                    .setKeyId(preKey.keyId())
+                    .setPublicKey(ByteString.copyFrom(preKey.serializedPublicKey()))
+                    .setSignature(ByteString.copyFrom(preKey.signature()))
+                    .build())
+                .toList())
+            .build());
+
+    final UUID expectedIdentifier = switch (IdentityTypeUtil.fromGrpcIdentityType(identityType)) {
+      case ACI -> AUTHENTICATED_ACI;
+      case PNI -> AUTHENTICATED_PNI;
+    };
+
+    verify(keysManager).storeKemOneTimePreKeys(expectedIdentifier, AUTHENTICATED_DEVICE_ID, preKeys);
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  void setOneTimeKemSignedPreKeysWithError(final SetOneTimeKemSignedPreKeysRequest request) {
+    assertStatusException(Status.INVALID_ARGUMENT, () -> authenticatedServiceStub().setOneTimeKemSignedPreKeys(request));
+  }
+
+  private static Stream<Arguments> setOneTimeKemSignedPreKeysWithError() {
+    final KEMSignedPreKey signedPreKey = KeysHelper.signedKEMPreKey(1, ACI_IDENTITY_KEY_PAIR);
+
+    final SetOneTimeKemSignedPreKeysRequest prototypeRequest = SetOneTimeKemSignedPreKeysRequest.newBuilder()
+        .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+        .addPreKeys(KemSignedPreKey.newBuilder()
+            .setKeyId(1)
+            .setPublicKey(ByteString.copyFrom(signedPreKey.serializedPublicKey()))
+            .setSignature(ByteString.copyFrom(signedPreKey.signature()))
+            .build())
+        .build();
+
+    return Stream.of(
+        // Missing identity type
+        Arguments.of(SetOneTimeKemSignedPreKeysRequest.newBuilder(prototypeRequest)
+            .clearIdentityType()
+            .build()),
+
+        // Invalid public key
+        Arguments.of(SetOneTimeKemSignedPreKeysRequest.newBuilder(prototypeRequest)
+            .setPreKeys(0, KemSignedPreKey.newBuilder(prototypeRequest.getPreKeys(0))
+                .clearPublicKey()
+                .build())
+            .build()),
+
+        // Invalid signature
+        Arguments.of(SetOneTimeKemSignedPreKeysRequest.newBuilder(prototypeRequest)
+            .setPreKeys(0, KemSignedPreKey.newBuilder(prototypeRequest.getPreKeys(0))
+                .clearSignature()
+                .build())
+            .build()),
+
+        // No keys
+        Arguments.of(SetOneTimeKemSignedPreKeysRequest.newBuilder(prototypeRequest)
+            .clearPreKeys()
+            .build())
+    );
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = io.zonarosa.chat.common.IdentityType.class, names = {"IDENTITY_TYPE_ACI", "IDENTITY_TYPE_PNI"})
+  void setSignedPreKey(final io.zonarosa.chat.common.IdentityType identityType) {
+    when(accountsManager.updateDeviceAsync(any(), anyByte(), any())).thenAnswer(invocation -> {
+      final Account account = invocation.getArgument(0);
+      final byte deviceId = invocation.getArgument(1);
+      final Consumer<Device> deviceUpdater = invocation.getArgument(2);
+
+      account.getDevice(deviceId).ifPresent(deviceUpdater);
+
+      return CompletableFuture.completedFuture(account);
+    });
+
+    when(keysManager.storeEcSignedPreKeys(any(), anyByte(), any())).thenReturn(CompletableFuture.completedFuture(null));
+
+    final ECKeyPair identityKeyPair = switch (IdentityTypeUtil.fromGrpcIdentityType(identityType)) {
+      case ACI -> ACI_IDENTITY_KEY_PAIR;
+      case PNI -> PNI_IDENTITY_KEY_PAIR;
+    };
+
+    final ECSignedPreKey signedPreKey = KeysHelper.signedECPreKey(17, identityKeyPair);
+
+    //noinspection ResultOfMethodCallIgnored
+    authenticatedServiceStub().setEcSignedPreKey(SetEcSignedPreKeyRequest.newBuilder()
+            .setIdentityType(identityType)
+            .setSignedPreKey(EcSignedPreKey.newBuilder()
+                .setKeyId(signedPreKey.keyId())
+                .setPublicKey(ByteString.copyFrom(signedPreKey.serializedPublicKey()))
+                .setSignature(ByteString.copyFrom(signedPreKey.signature()))
+                .build())
+            .build());
+
+    final UUID expectedIdentifier = switch (identityType) {
+      case IDENTITY_TYPE_ACI -> AUTHENTICATED_ACI;
+      case IDENTITY_TYPE_PNI -> AUTHENTICATED_PNI;
+      default -> throw new IllegalArgumentException("Unexpected identity type");
+    };
+
+    verify(keysManager).storeEcSignedPreKeys(expectedIdentifier, AUTHENTICATED_DEVICE_ID, signedPreKey);
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  void setSignedPreKeyWithError(final SetEcSignedPreKeyRequest request) {
+    final StatusRuntimeException exception =
+        assertThrows(StatusRuntimeException.class, () -> authenticatedServiceStub().setEcSignedPreKey(request));
+
+    assertEquals(Status.INVALID_ARGUMENT.getCode(), exception.getStatus().getCode());
+  }
+
+  private static Stream<Arguments> setSignedPreKeyWithError() {
+    final ECSignedPreKey signedPreKey = KeysHelper.signedECPreKey(17, ACI_IDENTITY_KEY_PAIR);
+
+    final SetEcSignedPreKeyRequest prototypeRequest = SetEcSignedPreKeyRequest.newBuilder()
+        .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+        .setSignedPreKey(EcSignedPreKey.newBuilder()
+            .setKeyId(signedPreKey.keyId())
+            .setPublicKey(ByteString.copyFrom(signedPreKey.serializedPublicKey()))
+            .setSignature(ByteString.copyFrom(signedPreKey.signature()))
+            .build())
+        .build();
+
+    return Stream.of(
+        // Missing identity type
+        Arguments.of(SetEcSignedPreKeyRequest.newBuilder(prototypeRequest)
+            .clearIdentityType()
+            .build()),
+
+        // Invalid public key
+        Arguments.of(SetEcSignedPreKeyRequest.newBuilder(prototypeRequest)
+                .setSignedPreKey(EcSignedPreKey.newBuilder(prototypeRequest.getSignedPreKey())
+                    .clearPublicKey()
+                    .build())
+                .build()),
+
+        // Invalid signature
+        Arguments.of(SetEcSignedPreKeyRequest.newBuilder(prototypeRequest)
+            .setSignedPreKey(EcSignedPreKey.newBuilder(prototypeRequest.getSignedPreKey())
+                .clearSignature()
+                .build())
+            .build()),
+
+        // Missing key
+        Arguments.of(SetEcSignedPreKeyRequest.newBuilder(prototypeRequest)
+            .clearSignedPreKey()
+            .build())
+    );
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = io.zonarosa.chat.common.IdentityType.class, names = {"IDENTITY_TYPE_ACI", "IDENTITY_TYPE_PNI"})
+  void setLastResortPreKey(final io.zonarosa.chat.common.IdentityType identityType) {
+    when(keysManager.storePqLastResort(any(), anyByte(), any())).thenReturn(CompletableFuture.completedFuture(null));
+
+    final ECKeyPair identityKeyPair = switch (IdentityTypeUtil.fromGrpcIdentityType(identityType)) {
+      case ACI -> ACI_IDENTITY_KEY_PAIR;
+      case PNI -> PNI_IDENTITY_KEY_PAIR;
+    };
+
+    final KEMSignedPreKey lastResortPreKey = KeysHelper.signedKEMPreKey(17, identityKeyPair);
+
+    //noinspection ResultOfMethodCallIgnored
+    authenticatedServiceStub().setKemLastResortPreKey(SetKemLastResortPreKeyRequest.newBuilder()
+            .setIdentityType(identityType)
+            .setSignedPreKey(KemSignedPreKey.newBuilder()
+                .setKeyId(lastResortPreKey.keyId())
+                .setPublicKey(ByteString.copyFrom(lastResortPreKey.serializedPublicKey()))
+                .setSignature(ByteString.copyFrom(lastResortPreKey.signature()))
+                .build())
+            .build());
+
+    final UUID expectedIdentifier = switch (identityType) {
+      case IDENTITY_TYPE_ACI -> AUTHENTICATED_ACI;
+      case IDENTITY_TYPE_PNI -> AUTHENTICATED_PNI;
+      case IDENTITY_TYPE_UNSPECIFIED, UNRECOGNIZED -> throw new AssertionError("Bad identity type");
+    };
+
+    verify(keysManager).storePqLastResort(expectedIdentifier, AUTHENTICATED_DEVICE_ID, lastResortPreKey);
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  void setLastResortPreKeyWithError(final SetKemLastResortPreKeyRequest request) {
+    assertStatusException(Status.INVALID_ARGUMENT, () -> authenticatedServiceStub().setKemLastResortPreKey(request));
+  }
+
+  private static Stream<Arguments> setLastResortPreKeyWithError() {
+    final KEMSignedPreKey lastResortPreKey = KeysHelper.signedKEMPreKey(17, ACI_IDENTITY_KEY_PAIR);
+
+    final SetKemLastResortPreKeyRequest prototypeRequest = SetKemLastResortPreKeyRequest.newBuilder()
+        .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+        .setSignedPreKey(KemSignedPreKey.newBuilder()
+            .setKeyId(lastResortPreKey.keyId())
+            .setPublicKey(ByteString.copyFrom(lastResortPreKey.serializedPublicKey()))
+            .setSignature(ByteString.copyFrom(lastResortPreKey.signature()))
+            .build())
+        .build();
+
+    return Stream.of(
+        // No identity type
+        Arguments.of(SetKemLastResortPreKeyRequest.newBuilder(prototypeRequest)
+            .clearIdentityType()
+            .build()),
+
+        // Bad public key
+        Arguments.of(SetKemLastResortPreKeyRequest.newBuilder(prototypeRequest)
+            .setSignedPreKey(KemSignedPreKey.newBuilder(prototypeRequest.getSignedPreKey())
+                .clearPublicKey()
+                .build())
+            .build()),
+
+        // Bad signature
+        Arguments.of(SetKemLastResortPreKeyRequest.newBuilder(prototypeRequest)
+            .setSignedPreKey(KemSignedPreKey.newBuilder(prototypeRequest.getSignedPreKey())
+                .clearSignature()
+                .build())
+            .build()),
+
+        // Missing key
+        Arguments.of(SetKemLastResortPreKeyRequest.newBuilder(prototypeRequest)
+            .clearSignedPreKey()
+            .build())
+    );
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = io.zonarosa.chat.common.IdentityType.class, names = {"IDENTITY_TYPE_ACI", "IDENTITY_TYPE_PNI"})
+  void getPreKeys(final io.zonarosa.chat.common.IdentityType grpcIdentityType) {
+    final Account targetAccount = mock(Account.class);
+
+    final ECKeyPair identityKeyPair = ECKeyPair.generate();
+    final IdentityKey identityKey = new IdentityKey(identityKeyPair.getPublicKey());
+    final UUID identifier = UUID.randomUUID();
+
+    final IdentityType identityType = IdentityTypeUtil.fromGrpcIdentityType(grpcIdentityType);
+    final io.zonarosa.server.identity.ServiceIdentifier serviceIdentifier = switch (identityType) {
+      case PNI -> new PniServiceIdentifier(identifier);
+      case ACI -> new AciServiceIdentifier(identifier);
+    };
+
+    when(targetAccount.getUuid()).thenReturn(UUID.randomUUID());
+    when(targetAccount.getIdentifier(identityType)).thenReturn(identifier);
+    when(targetAccount.getIdentityKey(identityType)).thenReturn(identityKey);
+    when(accountsManager.getByServiceIdentifierAsync(serviceIdentifier))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(targetAccount)));
+
+    final Map<Byte, KeysManager.DevicePreKeys> devicePreKeysMap = new HashMap<>();
+
+    final Map<Byte, Device> devices = new HashMap<>();
+    final Map<Byte, DevicePreKeyBundle> expectedPreKeyBundles = new HashMap<>();
+
+    final byte deviceId1 = 1;
+    final byte deviceId2 = 2;
+    final Map<Byte, Integer> deviceRegistrations = Map.of(
+        deviceId1, 123,
+        deviceId2, 456
+    );
+
+    for (Map.Entry<Byte, Integer> entry : deviceRegistrations.entrySet()) {
+
+      final ECSignedPreKey ecSignedPreKey = KeysHelper.signedECPreKey(3, identityKeyPair);
+      final Optional<ECPreKey> maybeEcPreKey = Optional
+          .of(new ECPreKey(1, ECKeyPair.generate().getPublicKey()))
+          .filter(_ -> entry.getKey() == deviceId1);
+      final KEMSignedPreKey kemSignedPreKey = KeysHelper.signedKEMPreKey(2, identityKeyPair);
+
+      devicePreKeysMap.put(entry.getKey(), new KeysManager.DevicePreKeys(ecSignedPreKey, maybeEcPreKey, kemSignedPreKey));
+
+      final DevicePreKeyBundle.Builder builder = DevicePreKeyBundle.newBuilder()
+          .setEcSignedPreKey(EcSignedPreKey.newBuilder()
+              .setKeyId(ecSignedPreKey.keyId())
+              .setPublicKey(ByteString.copyFrom(ecSignedPreKey.serializedPublicKey()))
+              .setSignature(ByteString.copyFrom(ecSignedPreKey.signature()))
+              .build())
+          .setKemOneTimePreKey(KemSignedPreKey.newBuilder()
+              .setKeyId(kemSignedPreKey.keyId())
+              .setPublicKey(ByteString.copyFrom(kemSignedPreKey.serializedPublicKey()))
+              .setSignature(ByteString.copyFrom(kemSignedPreKey.signature()))
+              .build())
+          .setRegistrationId(entry.getValue());
+      maybeEcPreKey.ifPresent(ecPreKey -> builder
+            .setEcOneTimePreKey(EcPreKey.newBuilder()
+                .setKeyId(ecPreKey.keyId())
+                .setPublicKey(ByteString.copyFrom(ecPreKey.serializedPublicKey()))
+                .build()));
+      expectedPreKeyBundles.put(entry.getKey(), builder.build());
+
+      final Device device = mock(Device.class);
+      when(device.getId()).thenReturn(entry.getKey());
+      when(device.getRegistrationId(any())).thenReturn(entry.getValue());
+
+      devices.put(entry.getKey(), device);
+      when(targetAccount.getDevice(entry.getKey())).thenReturn(Optional.of(device));
+    }
+
+    when(targetAccount.getDevices()).thenReturn(new ArrayList<>(devices.values()));
+
+    devicePreKeysMap.forEach((deviceId, preKeys) -> when(keysManager.takeDevicePreKeys(eq(deviceId),
+        eq(serviceIdentifier), any()))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(preKeys))));
+
+    {
+      final GetPreKeysResponse response = authenticatedServiceStub().getPreKeys(GetPreKeysRequest.newBuilder()
+          .setTargetIdentifier(ServiceIdentifier.newBuilder()
+              .setIdentityType(grpcIdentityType)
+              .setUuid(UUIDUtil.toByteString(identifier))
+              .build())
+          .setDeviceId(1)
+          .build());
+
+      final GetPreKeysResponse expectedResponse = GetPreKeysResponse.newBuilder()
+          .setPreKeys(AccountPreKeyBundles.newBuilder()
+              .setIdentityKey(ByteString.copyFrom(identityKey.serialize()))
+              .putDevicePreKeys(1, expectedPreKeyBundles.get(deviceId1)))
+          .build();
+
+      assertEquals(expectedResponse, response);
+    }
+
+    {
+      final GetPreKeysResponse response = authenticatedServiceStub().getPreKeys(GetPreKeysRequest.newBuilder()
+          .setTargetIdentifier(ServiceIdentifier.newBuilder()
+              .setIdentityType(grpcIdentityType)
+              .setUuid(UUIDUtil.toByteString(identifier))
+              .build())
+          .build());
+
+      final GetPreKeysResponse expectedResponse = GetPreKeysResponse.newBuilder()
+          .setPreKeys(AccountPreKeyBundles.newBuilder()
+              .setIdentityKey(ByteString.copyFrom(identityKey.serialize()))
+              .putDevicePreKeys(1, expectedPreKeyBundles.get(deviceId1))
+              .putDevicePreKeys(2, expectedPreKeyBundles.get(deviceId2)))
+          .build();
+
+      assertEquals(expectedResponse, response);
+    }
+  }
+
+  @Test
+  void getPreKeysAccountNotFound() {
+    when(accountsManager.getByServiceIdentifierAsync(any()))
+        .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+
+    final GetPreKeysResponse response = authenticatedServiceStub().getPreKeys(GetPreKeysRequest.newBuilder()
+        .setTargetIdentifier(ServiceIdentifier.newBuilder()
+            .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+            .setUuid(UUIDUtil.toByteString(UUID.randomUUID()))
+            .build())
+        .build());
+    assertTrue(response.hasTargetNotFound());
+  }
+
+  @Test
+  void getPreKeysDeviceNotFound() {
+    final UUID accountIdentifier = UUID.randomUUID();
+
+    final Account targetAccount = mock(Account.class);
+    when(targetAccount.getUuid()).thenReturn(accountIdentifier);
+    when(targetAccount.getIdentityKey(IdentityType.ACI)).thenReturn(new IdentityKey(ECKeyPair.generate().getPublicKey()));
+    when(targetAccount.getDevices()).thenReturn(Collections.emptyList());
+    when(targetAccount.getDevice(anyByte())).thenReturn(Optional.empty());
+
+    when(accountsManager.getByServiceIdentifierAsync(new AciServiceIdentifier(accountIdentifier)))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(targetAccount)));
+
+    final GetPreKeysResponse response = authenticatedServiceStub().getPreKeys(GetPreKeysRequest.newBuilder()
+        .setTargetIdentifier(ServiceIdentifier.newBuilder()
+            .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+            .setUuid(UUIDUtil.toByteString(accountIdentifier))
+            .build())
+        .setDeviceId(Device.PRIMARY_ID)
+        .build());
+    assertTrue(response.hasTargetNotFound());
+  }
+
+  @Test
+  void getPreKeysRateLimited() {
+    final Account targetAccount = mock(Account.class);
+    when(targetAccount.getUuid()).thenReturn(UUID.randomUUID());
+    when(targetAccount.getIdentityKey(IdentityType.ACI)).thenReturn(new IdentityKey(ECKeyPair.generate().getPublicKey()));
+    when(targetAccount.getDevices()).thenReturn(Collections.emptyList());
+    when(targetAccount.getDevice(anyByte())).thenReturn(Optional.empty());
+
+    when(accountsManager.getByServiceIdentifierAsync(any()))
+        .thenReturn(CompletableFuture.completedFuture(Optional.of(targetAccount)));
+
+    final Duration retryAfterDuration = Duration.ofMinutes(7);
+    when(preKeysRateLimiter.validateReactive(anyString()))
+        .thenReturn(Mono.error(new RateLimitExceededException(retryAfterDuration)));
+
+    assertRateLimitExceeded(retryAfterDuration, () -> authenticatedServiceStub().getPreKeys(GetPreKeysRequest.newBuilder()
+        .setTargetIdentifier(ServiceIdentifier.newBuilder()
+            .setIdentityType(io.zonarosa.chat.common.IdentityType.IDENTITY_TYPE_ACI)
+            .setUuid(UUIDUtil.toByteString(UUID.randomUUID()))
+            .build())
+        .build()));
+    verifyNoInteractions(accountsManager);
+  }
+}

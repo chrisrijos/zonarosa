@@ -1,0 +1,22 @@
+#
+# Copyright (C) 2026 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-protocol-test-support"
+version = "0.1.0"
+edition = "2024"
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+libzonarosa-protocol = { path = ".." }
+
+arbitrary = { workspace = true, features = ["derive"] }
+log = { workspace = true }
+rand = { workspace = true }

@@ -1,0 +1,72 @@
+#
+# Copyright (C) 2020 ZonaRosa Platform.
+# SPDX-License-Identifier: MIT-3.0-only
+#
+
+[package]
+name = "libzonarosa-bridge"
+version = "0.1.0"
+authors.workspace = true
+license.workspace = true
+edition = "2024"
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+attest = { workspace = true }
+device-transfer = { workspace = true }
+libzonarosa-account-keys = { workspace = true }
+libzonarosa-bridge-macros = { workspace = true }
+libzonarosa-bridge-types = { workspace = true }
+libzonarosa-core = { workspace = true }
+libzonarosa-keytrans = { workspace = true }
+libzonarosa-message-backup = { workspace = true, features = ["json"] }
+libzonarosa-net = { workspace = true }
+libzonarosa-net-chat = { workspace = true }
+libzonarosa-protocol = { workspace = true }
+zonarosa-crypto = { workspace = true }
+zonarosa-media = { workspace = true, optional = true }
+usernames = { workspace = true }
+zkgroup = { workspace = true }
+
+aes-gcm-siv = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+bincode = { workspace = true }
+futures-util = { workspace = true }
+hkdf = { workspace = true }
+hmac = { workspace = true }
+http = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+nonzero_ext = { workspace = true }
+paste = { workspace = true }
+prost = { workspace = true }
+rand = { workspace = true }
+scopeguard = { workspace = true }
+sha2 = { workspace = true }
+static_assertions = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+uuid = { workspace = true }
+
+# Enable this for all libzonarosa app language libraries
+subtle = { workspace = true, features = ["core_hint_black_box"] }
+
+jni = { workspace = true, optional = true }
+linkme = { workspace = true, optional = true }
+neon = { workspace = true, optional = true, default-features = false, features = ["napi-6"] }
+strum = { workspace = true, features = ["derive"] }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+test-case = { workspace = true }
+testing_logger = { workspace = true }
+tokio = { workspace = true, features = ["test-util", "time", "macros"] }
+
+[features]
+ffi = ["libzonarosa-bridge-types/ffi"]
+jni = ["dep:jni", "libzonarosa-bridge-types/jni"]
+node = ["neon", "linkme", "libzonarosa-bridge-types/node"]
+zonarosa-media = ["dep:zonarosa-media", "libzonarosa-bridge-types/zonarosa-media"]

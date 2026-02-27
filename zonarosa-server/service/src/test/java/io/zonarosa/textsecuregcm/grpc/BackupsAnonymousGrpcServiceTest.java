@@ -1,0 +1,403 @@
+/*
+ * Copyright 2023 ZonaRosa Platform
+ * SPDX-License-Identifier: MIT-3.0-only
+ */
+
+package io.zonarosa.server.grpc;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junitpioneer.jupiter.cartesian.CartesianTest;
+import org.mockito.Mock;
+import io.zonarosa.chat.backup.BackupsAnonymousGrpc;
+import io.zonarosa.chat.backup.CopyMediaItem;
+import io.zonarosa.chat.backup.CopyMediaRequest;
+import io.zonarosa.chat.backup.CopyMediaResponse;
+import io.zonarosa.chat.backup.DeleteMediaItem;
+import io.zonarosa.chat.backup.DeleteMediaRequest;
+import io.zonarosa.chat.backup.GetBackupInfoRequest;
+import io.zonarosa.chat.backup.GetCdnCredentialsRequest;
+import io.zonarosa.chat.backup.GetCdnCredentialsResponse;
+import io.zonarosa.chat.backup.GetMediaBackupInfoResponse;
+import io.zonarosa.chat.backup.GetMessageBackupInfoResponse;
+import io.zonarosa.chat.backup.GetUploadFormRequest;
+import io.zonarosa.chat.backup.GetUploadFormResponse;
+import io.zonarosa.chat.backup.ListMediaRequest;
+import io.zonarosa.chat.backup.ListMediaResponse;
+import io.zonarosa.chat.backup.SetPublicKeyRequest;
+import io.zonarosa.chat.backup.SetPublicKeyResponse;
+import io.zonarosa.chat.backup.SignedPresentation;
+import io.zonarosa.libzonarosa.protocol.ecc.ECKeyPair;
+import io.zonarosa.libzonarosa.zkgroup.VerificationFailedException;
+import io.zonarosa.libzonarosa.zkgroup.backups.BackupAuthCredentialPresentation;
+import io.zonarosa.libzonarosa.zkgroup.backups.BackupCredentialType;
+import io.zonarosa.libzonarosa.zkgroup.backups.BackupLevel;
+import io.zonarosa.server.auth.AuthenticatedBackupUser;
+import io.zonarosa.server.backup.BackupAuthTestUtil;
+import io.zonarosa.server.backup.BackupException;
+import io.zonarosa.server.backup.BackupFailedZkAuthenticationException;
+import io.zonarosa.server.backup.BackupManager;
+import io.zonarosa.server.backup.BackupUploadDescriptor;
+import io.zonarosa.server.backup.CopyResult;
+import io.zonarosa.server.controllers.RateLimitExceededException;
+import io.zonarosa.server.metrics.BackupMetrics;
+import io.zonarosa.server.util.TestRandomUtil;
+import reactor.core.publisher.Flux;
+
+class BackupsAnonymousGrpcServiceTest extends
+    SimpleBaseGrpcTest<BackupsAnonymousGrpcService, BackupsAnonymousGrpc.BackupsAnonymousBlockingStub> {
+
+  private final UUID aci = UUID.randomUUID();
+  private final byte[] messagesBackupKey = TestRandomUtil.nextBytes(32);
+  private final BackupAuthTestUtil backupAuthTestUtil = new BackupAuthTestUtil(Clock.systemUTC());
+  private final BackupAuthCredentialPresentation presentation =
+      presentation(backupAuthTestUtil, messagesBackupKey, aci);
+
+  @Mock
+  private BackupManager backupManager;
+
+  @Override
+  protected BackupsAnonymousGrpcService createServiceBeforeEachTest() {
+    return new BackupsAnonymousGrpcService(backupManager, new BackupMetrics());
+  }
+
+  @BeforeEach
+  void setup() {
+    try {
+      when(backupManager.authenticateBackupUser(any(), any(), any()))
+          .thenReturn(backupUser(presentation.getBackupId(), BackupCredentialType.MESSAGES, BackupLevel.PAID));
+    } catch (BackupFailedZkAuthenticationException e) {
+      Assertions.fail(e);
+    }
+  }
+
+  @Test
+  void setPublicKey() {
+    assertThat(unauthenticatedServiceStub().setPublicKey(SetPublicKeyRequest.newBuilder()
+        .setPublicKey(ByteString.copyFrom(ECKeyPair.generate().getPublicKey().serialize()))
+        .setSignedPresentation(signedPresentation(presentation))
+        .build())
+        .getOutcomeCase()).isEqualTo(SetPublicKeyResponse.OutcomeCase.SUCCESS);
+  }
+
+  @Test
+  void setBadPublicKey() {
+    assertThatExceptionOfType(StatusRuntimeException.class).isThrownBy(() ->
+            unauthenticatedServiceStub().setPublicKey(SetPublicKeyRequest.newBuilder()
+                .setPublicKey(ByteString.copyFromUtf8("aaaaa")) // Invalid public key
+                .setSignedPresentation(signedPresentation(presentation))
+                .build()))
+        .extracting(ex -> ex.getStatus().getCode())
+        .isEqualTo(Status.Code.INVALID_ARGUMENT);
+  }
+
+  @Test
+  void setMissingPublicKey() {
+    assertThatExceptionOfType(StatusRuntimeException.class).isThrownBy(() ->
+            unauthenticatedServiceStub().setPublicKey(SetPublicKeyRequest.newBuilder()
+                // Missing public key
+                .setSignedPresentation(signedPresentation(presentation))
+                .build()))
+        .extracting(ex -> ex.getStatus().getCode())
+        .isEqualTo(Status.Code.INVALID_ARGUMENT);
+  }
+
+
+  @Test
+  void putMediaBatchSuccess() {
+    final byte[][] mediaIds = {TestRandomUtil.nextBytes(15), TestRandomUtil.nextBytes(15)};
+    when(backupManager.copyToBackup(any()))
+        .thenReturn(Flux.just(
+            new CopyResult(CopyResult.Outcome.SUCCESS, mediaIds[0], 1),
+            new CopyResult(CopyResult.Outcome.SUCCESS, mediaIds[1], 1)));
+
+    final CopyMediaRequest request = CopyMediaRequest.newBuilder()
+        .setSignedPresentation(signedPresentation(presentation))
+        .addItems(CopyMediaItem.newBuilder()
+            .setSourceAttachmentCdn(3)
+            .setSourceKey("abc")
+            .setObjectLength(100)
+            .setMediaId(ByteString.copyFrom(mediaIds[0]))
+            .setHmacKey(ByteString.copyFrom(TestRandomUtil.nextBytes(32)))
+            .setEncryptionKey(ByteString.copyFrom(TestRandomUtil.nextBytes(32)))
+            .build())
+        .addItems(CopyMediaItem.newBuilder()
+            .setSourceAttachmentCdn(3)
+            .setSourceKey("def")
+            .setObjectLength(200)
+            .setMediaId(ByteString.copyFrom(mediaIds[1]))
+            .setHmacKey(ByteString.copyFrom(TestRandomUtil.nextBytes(32)))
+            .setEncryptionKey(ByteString.copyFrom(TestRandomUtil.nextBytes(32)))
+            .build())
+        .build();
+
+    final Iterator<CopyMediaResponse> it = unauthenticatedServiceStub().copyMedia(request);
+
+    for (int i = 0; i < 2; i++) {
+      final CopyMediaResponse response = it.next();
+      assertThat(response.getSuccess().getCdn()).isEqualTo(1);
+      assertThat(response.getMediaId().toByteArray()).isEqualTo(mediaIds[i]);
+    }
+    assertThat(it.hasNext()).isFalse();
+  }
+
+  @Test
+  void putMediaBatchPartialFailure() {
+    // Copy four different mediaIds, with a variety of success/failure outcomes
+    final byte[][] mediaIds = IntStream.range(0, 4).mapToObj(i -> TestRandomUtil.nextBytes(15)).toArray(byte[][]::new);
+    final CopyResult.Outcome[] outcomes = new CopyResult.Outcome[]{
+        CopyResult.Outcome.SUCCESS,
+        CopyResult.Outcome.SOURCE_NOT_FOUND,
+        CopyResult.Outcome.SOURCE_WRONG_LENGTH,
+        CopyResult.Outcome.OUT_OF_QUOTA
+    };
+    when(backupManager.copyToBackup(any()))
+        .thenReturn(Flux.fromStream(IntStream.range(0, 4)
+            .mapToObj(i -> new CopyResult(
+                outcomes[i],
+                mediaIds[i],
+                outcomes[i] == CopyResult.Outcome.SUCCESS ? 1 : null))));
+
+    final CopyMediaRequest request = CopyMediaRequest.newBuilder()
+        .setSignedPresentation(signedPresentation(presentation))
+        .addAllItems(Arrays.stream(mediaIds)
+            .map(mediaId -> CopyMediaItem.newBuilder()
+                .setSourceAttachmentCdn(3)
+                .setSourceKey("abc")
+                .setObjectLength(100)
+                .setMediaId(ByteString.copyFrom(mediaId))
+                .setHmacKey(ByteString.copyFrom(TestRandomUtil.nextBytes(32)))
+                .setEncryptionKey(ByteString.copyFrom(TestRandomUtil.nextBytes(32)))
+                .build())
+            .collect(Collectors.toList()))
+        .build();
+
+    final Iterator<CopyMediaResponse> responses = unauthenticatedServiceStub().copyMedia(request);
+
+    // Verify that we get the expected response for each mediaId
+    for (int i = 0; i < mediaIds.length; i++) {
+      final CopyMediaResponse response = responses.next();
+      switch (outcomes[i]) {
+        case SUCCESS -> assertThat(response.getSuccess().getCdn()).isEqualTo(1);
+        case SOURCE_WRONG_LENGTH -> assertThat(response.getWrongSourceLength()).isNotNull();
+        case OUT_OF_QUOTA -> assertThat(response.getOutOfSpace()).isNotNull();
+        case SOURCE_NOT_FOUND -> assertThat(response.getSourceNotFound()).isNotNull();
+      }
+      assertThat(response.getMediaId().toByteArray()).isEqualTo(mediaIds[i]);
+    }
+  }
+
+  @Test
+  void getMessageBackupInfo() throws BackupException {
+    when(backupManager.backupInfo(any()))
+        .thenReturn(new BackupManager.BackupInfo(1, "myBackupDir", "myMediaDir", "filename", Optional.empty()));
+
+    final GetMessageBackupInfoResponse response = unauthenticatedServiceStub().getMessageBackupInfo(GetBackupInfoRequest.newBuilder()
+        .setSignedPresentation(signedPresentation(presentation))
+        .build());
+    assertThat(response.getBackupInfo().getBackupDir()).isEqualTo("myBackupDir");
+    assertThat(response.getBackupInfo().getBackupName()).isEqualTo("filename");
+    assertThat(response.getBackupInfo().getCdn()).isEqualTo(1);
+  }
+
+  @Test
+  void getMediaBackupInfo() throws BackupException {
+    when(backupManager.authenticateBackupUser(any(), any(), any()))
+        .thenReturn(backupUser(presentation.getBackupId(), BackupCredentialType.MEDIA, BackupLevel.PAID));
+    when(backupManager.backupInfo(any()))
+        .thenReturn(new BackupManager.BackupInfo(1, "myBackupDir", "myMediaDir", "filename", Optional.of(123L)));
+
+    final GetMediaBackupInfoResponse response = unauthenticatedServiceStub().getMediaBackupInfo(GetBackupInfoRequest.newBuilder()
+        .setSignedPresentation(signedPresentation(presentation))
+        .build());
+    assertThat(response.getBackupInfo().getBackupDir()).isEqualTo("myBackupDir");
+    assertThat(response.getBackupInfo().getMediaDir()).isEqualTo("myMediaDir");
+    assertThat(response.getBackupInfo().getUsedSpace()).isEqualTo(123);
+  }
+
+  @ParameterizedTest
+  @EnumSource(BackupCredentialType.class)
+  void getBackupInfoWrongCredentialType(BackupCredentialType credentialType)
+      throws BackupFailedZkAuthenticationException {
+    when(backupManager.authenticateBackupUser(any(), any(), any()))
+        .thenReturn(backupUser(presentation.getBackupId(), credentialType, BackupLevel.PAID));
+    assertThatExceptionOfType(StatusRuntimeException.class).isThrownBy(() -> {
+          switch (credentialType) {
+            case MEDIA -> unauthenticatedServiceStub().getMessageBackupInfo(GetBackupInfoRequest.newBuilder()
+                .setSignedPresentation(signedPresentation(presentation))
+                .build());
+            case MESSAGES -> unauthenticatedServiceStub().getMediaBackupInfo(GetBackupInfoRequest.newBuilder()
+                .setSignedPresentation(signedPresentation(presentation))
+                .build());
+          }
+        })
+        .matches(ex -> ex.getStatus().getCode() == Status.Code.INVALID_ARGUMENT)
+        .matches(ex -> GrpcTestUtils.extractErrorInfo(ex).getReason().equals("BAD_AUTHENTICATION"));
+  }
+
+
+  @CartesianTest
+  void list(
+      @CartesianTest.Values(booleans = {true, false}) final boolean cursorProvided,
+      @CartesianTest.Values(booleans = {true, false}) final boolean cursorReturned)
+      throws VerificationFailedException, BackupException {
+
+    final byte[] mediaId = TestRandomUtil.nextBytes(15);
+    final Optional<String> expectedCursor = cursorProvided ? Optional.of("myCursor") : Optional.empty();
+    final Optional<String> returnedCursor = cursorReturned ? Optional.of("newCursor") : Optional.empty();
+
+    final int limit = 17;
+
+    when(backupManager.list(any(), eq(expectedCursor), eq(limit)))
+        .thenReturn(new BackupManager.ListMediaResult(
+            List.of(new BackupManager.StorageDescriptorWithLength(1, mediaId, 100)),
+            returnedCursor));
+
+    final ListMediaRequest.Builder request = ListMediaRequest.newBuilder()
+        .setSignedPresentation(signedPresentation(presentation))
+        .setLimit(limit);
+    if (cursorProvided) {
+      request.setCursor("myCursor");
+    }
+
+    final ListMediaResponse response = unauthenticatedServiceStub().listMedia(request.build());
+    assertThat(response.getListResult().getPageCount()).isEqualTo(1);
+    assertThat(response.getListResult().getPage(0).getLength()).isEqualTo(100);
+    assertThat(response.getListResult().getPage(0).getMediaId().toByteArray()).isEqualTo(mediaId);
+    assertThat(response.getListResult().hasCursor() ? response.getListResult().getCursor() : null)
+        .isEqualTo(returnedCursor.orElse(null));
+
+  }
+
+  @Test
+  void delete() throws BackupException {
+    final DeleteMediaRequest request = DeleteMediaRequest.newBuilder()
+        .setSignedPresentation(signedPresentation(presentation))
+        .addAllItems(IntStream.range(0, 100).mapToObj(i ->
+                DeleteMediaItem.newBuilder()
+                    .setCdn(3)
+                    .setMediaId(ByteString.copyFrom(TestRandomUtil.nextBytes(15)))
+                    .build())
+            .toList()).build();
+
+    when(backupManager.deleteMedia(any(), any()))
+        .thenReturn(Flux.fromStream(request.getItemsList().stream()
+            .map(m -> new BackupManager.StorageDescriptor(m.getCdn(), m.getMediaId().toByteArray()))));
+
+    final AtomicInteger count = new AtomicInteger(0);
+    unauthenticatedServiceStub().deleteMedia(request).forEachRemaining(i -> count.getAndIncrement());
+    assertThat(count.get()).isEqualTo(100);
+  }
+
+  @Test
+  void mediaUploadForm() throws RateLimitExceededException, BackupException {
+    when(backupManager.createTemporaryAttachmentUploadDescriptor(any()))
+        .thenReturn(new BackupUploadDescriptor(3, "abc", Map.of("k", "v"), "example.org"));
+    final GetUploadFormRequest request = GetUploadFormRequest.newBuilder()
+        .setMedia(GetUploadFormRequest.MediaUploadType.getDefaultInstance())
+        .setSignedPresentation(signedPresentation(presentation))
+        .build();
+
+    final GetUploadFormResponse uploadForm = unauthenticatedServiceStub().getUploadForm(request);
+    assertThat(uploadForm.getUploadForm().getCdn()).isEqualTo(3);
+    assertThat(uploadForm.getUploadForm().getKey()).isEqualTo("abc");
+    assertThat(uploadForm.getUploadForm().getHeadersMap()).containsExactlyEntriesOf(Map.of("k", "v"));
+    assertThat(uploadForm.getUploadForm().getSignedUploadLocation()).isEqualTo("example.org");
+
+    // rate limit
+    Duration duration = Duration.ofSeconds(10);
+    when(backupManager.createTemporaryAttachmentUploadDescriptor(any()))
+        .thenThrow(new RateLimitExceededException(duration));
+    GrpcTestUtils.assertRateLimitExceeded(duration, () -> unauthenticatedServiceStub().getUploadForm(request));
+  }
+
+  static Stream<Arguments> messagesUploadForm() {
+    return Stream.of(
+        Arguments.of(Optional.empty(), true),
+        Arguments.of(Optional.of(BackupManager.MAX_MESSAGE_BACKUP_OBJECT_SIZE), true),
+        Arguments.of(Optional.of(BackupManager.MAX_MESSAGE_BACKUP_OBJECT_SIZE + 1), false)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource
+  public void messagesUploadForm(Optional<Long> uploadLength, boolean allowedSize) throws BackupException {
+    when(backupManager.createMessageBackupUploadDescriptor(any()))
+        .thenReturn(new BackupUploadDescriptor(3, "abc", Map.of("k", "v"), "example.org"));
+    final GetUploadFormRequest.MessagesUploadType.Builder builder = GetUploadFormRequest.MessagesUploadType.newBuilder();
+    uploadLength.ifPresent(builder::setUploadLength);
+    final GetUploadFormRequest request = GetUploadFormRequest.newBuilder()
+        .setMessages(builder.build())
+        .setSignedPresentation(signedPresentation(presentation))
+        .build();
+    final GetUploadFormResponse response = unauthenticatedServiceStub().getUploadForm(request);
+    if (allowedSize) {
+      assertThat(response.getUploadForm().getCdn()).isEqualTo(3);
+      assertThat(response.getUploadForm().getKey()).isEqualTo("abc");
+      assertThat(response.getUploadForm().getHeadersMap()).containsExactlyEntriesOf(Map.of("k", "v"));
+      assertThat(response.getUploadForm().getSignedUploadLocation()).isEqualTo("example.org");
+    } else {
+      assertThat(response.hasExceedsMaxUploadLength()).isTrue();
+    }
+  }
+
+
+  @Test
+  void readAuth() throws BackupException {
+    when(backupManager.generateReadAuth(any(), eq(3))).thenReturn(Map.of("key", "value"));
+
+    final GetCdnCredentialsResponse response = unauthenticatedServiceStub().getCdnCredentials(
+        GetCdnCredentialsRequest.newBuilder()
+            .setCdn(3)
+            .setSignedPresentation(signedPresentation(presentation))
+            .build());
+    assertThat(response.getCdnCredentials().getHeadersMap()).containsExactlyEntriesOf(Map.of("key", "value"));
+  }
+
+  private static AuthenticatedBackupUser backupUser(final byte[] backupId, final BackupCredentialType credentialType,
+      final BackupLevel backupLevel) {
+    return new AuthenticatedBackupUser(backupId, credentialType, backupLevel, "myBackupDir", "myMediaDir", null);
+  }
+
+  private static BackupAuthCredentialPresentation presentation(BackupAuthTestUtil backupAuthTestUtil,
+      byte[] messagesBackupKey, UUID aci) {
+    try {
+      return backupAuthTestUtil.getPresentation(BackupLevel.PAID, messagesBackupKey, aci);
+    } catch (VerificationFailedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static SignedPresentation signedPresentation(BackupAuthCredentialPresentation presentation) {
+    return SignedPresentation.newBuilder()
+        .setPresentation(ByteString.copyFrom(presentation.serialize()))
+        .setPresentationSignature(ByteString.copyFromUtf8("aaa")).build();
+  }
+
+}

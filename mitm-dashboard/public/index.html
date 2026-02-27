@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZonaRosa · MITM Intercept Dashboard</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#8b5cf6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="ZonaRosa" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ── Header ──────────────────────────────────────────────────── -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-logo">◈</span>
+          <div>
+            <span class="brand-name">ZonaRosa</span>
+            <span class="brand-sub">Crypto Intercept Lab</span>
+          </div>
+        </div>
+
+        <div class="mode-panel">
+          <span class="mode-label" id="modeLabel">INTERCEPTING</span>
+
+          <div class="toggle-wrap">
+            <span class="toggle-tag e2e-tag">E2E</span>
+            <label
+              class="toggle"
+              id="modeToggle"
+              title="Toggle encryption mode"
+            >
+              <input type="checkbox" id="modeCheckbox" />
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-tag mitm-tag">MITM</span>
+          </div>
+
+          <div class="conn-status" id="connStatus">
+            <span class="conn-dot"></span>
+            <span id="connText">Connecting…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- mode change announcement banner -->
+      <div class="mode-banner" id="modeBanner" aria-live="polite"></div>
+    </header>
+
+    <!-- ── Stats bar ────────────────────────────────────────────────── -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <span class="stat-val" id="statTotal">0</span>
+        <span class="stat-key">Total Intercepted</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val decrypted" id="statDecrypted">0</span>
+        <span class="stat-key">Decrypted (MITM)</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val encrypted" id="statEncrypted">0</span>
+        <span class="stat-key">E2E Protected</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val" id="statSessions">0</span>
+        <span class="stat-key">Active Sessions</span>
+      </div>
+      <button class="clear-btn" id="clearBtn" title="Clear all messages">
+        ⌫ Clear
+      </button>
+    </div>
+
+    <!-- ── Explanation panel ────────────────────────────────────────── -->
+    <div class="explainer" id="explainer">
+      <div class="exp-icon">🔓</div>
+      <div class="exp-body">
+        <strong id="expTitle">MITM Mode Active</strong>
+        <p id="expDesc">
+          The ZonaRosa bastion proxy is sitting between clients and the server.
+          The Double Ratchet session key is not established end-to-end —
+          messages pass through this layer in plaintext before being
+          re-encrypted for transport. An attacker (or instructor) can read every
+          message.
+        </p>
+      </div>
+      <div class="exp-compare">
+        <div class="exp-path active" id="pathMITM">
+          <span
+            >Client → <span class="path-highlight">Proxy ✦ Dashboard</span> →
+            Server</span
+          >
+        </div>
+        <div class="exp-path" id="pathE2E">
+          <span
+            >Client → <span class="path-lock">🔒 E2E Tunnel</span> →
+            Server</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Message table ─────────────────────────────────────────────── -->
+    <main class="main">
+      <div class="table-wrap">
+        <table
+          class="msg-table"
+          id="msgTable"
+          aria-label="Intercepted Messages"
+        >
+          <thead>
+            <tr>
+              <th class="th-idx">#</th>
+              <th class="th-time">Timestamp</th>
+              <th class="th-sender">Sender</th>
+              <th class="th-recipient">Recipient</th>
+              <th class="th-status">Status</th>
+              <th class="th-content">Content</th>
+            </tr>
+          </thead>
+          <tbody id="msgBody">
+            <!-- rows injected by app.js -->
+          </tbody>
+        </table>
+
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">📡</div>
+          <p>Listening for messages…</p>
+          <code class="empty-hint">node simulator.js</code>
+        </div>
+      </div>
+    </main>
+
+    <!-- ── Ciphertext drawer ─────────────────────────────────────────── -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <aside class="cipher-drawer" id="cipherDrawer">
+      <div class="drawer-header">
+        <span class="drawer-title">Wire-Format Ciphertext</span>
+        <button class="drawer-close" id="drawerClose">✕</button>
+      </div>
+      <div class="drawer-meta" id="drawerMeta"></div>
+      <div class="cipher-block" id="drawerCiphertext"></div>
+      <div class="drawer-legend">
+        <span><code>33</code> = Version byte</span>
+        <span><code>[16 chars]</code> = HMAC-SHA256 MAC</span>
+        <span><code>[32 chars]</code> = IV / Nonce</span>
+        <span><code>[remaining]</code> = Encrypted body</span>
+      </div>
+    </aside>
+
+    <script src="app.js"></script>
+  </body>
+</html>

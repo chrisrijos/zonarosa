@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright 2023 ZonaRosa Platform
+  ~ SPDX-License-Identifier: MIT-3.0-only
+  -->
+
+<resources>
+
+    <style name="Theme.ZonaRosa" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>

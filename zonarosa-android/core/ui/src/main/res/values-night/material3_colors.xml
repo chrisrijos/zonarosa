@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core colors for Material3 -->
+    <color name="zonarosa_colorPrimary">@color/zonarosa_dark_colorPrimary</color>
+    <color name="zonarosa_colorPrimaryContainer">@color/zonarosa_dark_colorPrimaryContainer</color>
+    <color name="zonarosa_colorSecondary">@color/zonarosa_dark_colorSecondary</color>
+    <color name="zonarosa_colorSecondaryContainer">@color/zonarosa_dark_colorSecondaryContainer</color>
+    <color name="zonarosa_colorSurface">@color/zonarosa_dark_colorSurface</color>
+    <color name="zonarosa_colorSurfaceVariant">@color/zonarosa_dark_colorSurfaceVariant</color>
+    <color name="zonarosa_colorBackground">@color/zonarosa_dark_colorBackground</color>
+    <color name="zonarosa_colorError">@color/zonarosa_dark_colorError</color>
+    <color name="zonarosa_colorErrorContainer">@color/zonarosa_dark_colorErrorContainer</color>
+    <color name="zonarosa_colorOnPrimary">@color/zonarosa_dark_colorOnPrimary</color>
+    <color name="zonarosa_colorOnPrimaryContainer">@color/zonarosa_dark_colorOnPrimaryContainer</color>
+    <color name="zonarosa_colorOnSecondary">@color/zonarosa_dark_colorOnSecondary</color>
+    <color name="zonarosa_colorOnSecondaryContainer">@color/zonarosa_dark_colorOnSecondaryContainer</color>
+    <color name="zonarosa_colorOnSurface">@color/zonarosa_dark_colorOnSurface</color>
+    <color name="zonarosa_colorOnSurfaceVariant">@color/zonarosa_dark_colorOnSurfaceVariant</color>
+    <color name="zonarosa_colorOnSurfaceVariant1">@color/zonarosa_dark_colorOnSurfaceVariant1</color>
+    <color name="zonarosa_colorOnBackground">@color/zonarosa_dark_colorOnBackground</color>
+    <color name="zonarosa_colorOutline">@color/zonarosa_dark_colorOutline</color>
+    <color name="zonarosa_neutralSurface">@color/zonarosa_dark_neutralSurface</color>
+    <color name="zonarosa_colorOnCustom">@color/zonarosa_dark_colorOnCustom</color>
+    <color name="zonarosa_colorOnCustomVariant">@color/zonarosa_dark_colorOnCustomVariant</color>
+
+    <color name="zonarosa_colorSurface1">@color/zonarosa_dark_colorSurface1</color>
+    <color name="zonarosa_colorSurface2">@color/zonarosa_dark_colorSurface2</color>
+    <color name="zonarosa_colorSurface3">@color/zonarosa_dark_colorSurface3</color>
+    <color name="zonarosa_colorSurface4">@color/zonarosa_dark_colorSurface4</color>
+    <color name="zonarosa_colorSurface5">@color/zonarosa_dark_colorSurface5</color>
+
+    <color name="zonarosa_colorTransparent1">@color/zonarosa_dark_colorTransparent1</color>
+    <color name="zonarosa_colorTransparent2">@color/zonarosa_dark_colorTransparent2</color>
+    <color name="zonarosa_colorTransparent3">@color/zonarosa_dark_colorTransparent3</color>
+    <color name="zonarosa_colorTransparent4">@color/zonarosa_dark_colorTransparent4</color>
+    <color name="zonarosa_colorTransparent5">@color/zonarosa_dark_colorTransparent5</color>
+    <color name="zonarosa_colorNeutral">@color/zonarosa_dark_colorNeutral</color>
+    <color name="zonarosa_colorNeutralVariant">@color/zonarosa_dark_colorNeutralVariant</color>
+    <color name="zonarosa_colorTransparentInverse1">@color/zonarosa_dark_colorTransparentInverse1</color>
+    <color name="zonarosa_colorTransparentInverse2">@color/zonarosa_dark_colorTransparentInverse2</color>
+    <color name="zonarosa_colorTransparentInverse3">@color/zonarosa_dark_colorTransparentInverse3</color>
+    <color name="zonarosa_colorTransparentInverse4">@color/zonarosa_dark_colorTransparentInverse4</color>
+    <color name="zonarosa_colorTransparentInverse5">@color/zonarosa_dark_colorTransparentInverse5</color>
+    <color name="zonarosa_colorNeutralInverse">@color/zonarosa_dark_colorNeutralInverse</color>
+    <color name="zonarosa_colorNeutralVariantInverse">@color/zonarosa_dark_colorNeutralVariantInverse</color>
+
+    <!-- Inverses -->
+    <color name="zonarosa_colorOnSurfaceInverse">@color/zonarosa_light_colorOnSurface</color>
+    <color name="zonarosa_colorErrorInverse">@color/zonarosa_light_colorError</color>
+    <color name="zonarosa_colorErrorContainerInverse">@color/zonarosa_light_colorErrorContainer</color>
+
+    <!-- Core color alpha variants -->
+    <color name="zonarosa_colorSecondaryContainer_12">#1F414659</color>
+    <color name="zonarosa_colorSurface_60">#991B1C1F</color>
+    <color name="zonarosa_colorSurfaceVariant_38">#61303133</color>
+    <color name="zonarosa_colorSurfaceVariant_64">#A3303133</color>
+    <color name="zonarosa_colorOnSurface_12">#1FE2E1E5</color>
+    <color name="zonarosa_colorOnSurface_50">#80E2E1E5</color>
+    <color name="zonarosa_colorOnSurfaceVariant_60">#99BEBFC5</color>
+    <color name="zonarosa_colorOnBackground_60">#99E2E1E5</color>
+    <color name="zonarosa_colorOutline_38">#615C5E65</color>
+    <color name="zonarosa_colorBackground_0">#001B1C1F</color>
+
+    <!-- Core color alpha variants without alpha channel -->
+    <color name="zonarosa_colorSurfaceVariant_16_no_alpha">#3F4249</color>
+    <color name="zonarosa_colorSurfaceVariant_32_no_alpha">#5D5E62</color>
+
+</resources>
